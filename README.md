@@ -34,7 +34,20 @@ It features native Windows 11 Mica backdrop material, Windows Community Toolkit 
 
 ---
 
-## Building & Running
+## How to Run
+
+### From GitHub Releases (Pre-built)
+
+1. Go to [Releases](https://github.com/Unknownplanet40/LivelyScreen/releases) and download the latest **`LivelyScreen-win-x64.zip`**.
+2. Right-click the downloaded `.zip` file and select **Extract All...**.
+3. Open the extracted folder and double-click **`LivelyScreen.exe`**.
+4. LivelyScreen runs in your Windows System Tray (taskbar notification area).
+   - Press **Win + Ctrl + S** at any time to launch the screensaver instantly.
+   - Right-click the system tray icon to configure settings, themes, widgets, or exit.
+
+---
+
+## Building from Source
 
 ### Requirements
 - Windows 10 version 1809 (build 17763) or Windows 11
@@ -50,4 +63,4 @@ dotnet run --project src/LivelyScreen.WinUI/LivelyScreen.WinUI.csproj
 ```powershell
 dotnet publish src/LivelyScreen.WinUI/LivelyScreen.WinUI.csproj -c Release -p:PublishProfile=win-x64
 ```
-Output binary will be in `src/LivelyScreen.WinUI/bin/Release/net9.0-windows10.0.26100.0/win-x64/publish/LivelyScreen.exe`.
+Output binary will be located in `src/LivelyScreen.WinUI/bin/Release/net9.0-windows10.0.26100.0/win-x64/publish/LivelyScreen.exe`.
