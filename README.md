@@ -38,12 +38,20 @@ It features native Windows 11 Mica backdrop material, Windows Community Toolkit 
 
 ### From GitHub Releases (Pre-built)
 
-1. Go to [Releases](https://github.com/Unknownplanet40/LivelyScreen/releases) and download the latest **`LivelyScreen-win-x64.zip`**.
-2. Right-click the downloaded `.zip` file and select **Extract All...**.
-3. Open the extracted folder and double-click **`LivelyScreen.exe`**.
-4. LivelyScreen runs in your Windows System Tray (taskbar notification area).
-   - Press **Win + Ctrl + S** at any time to launch the screensaver instantly.
-   - Right-click the system tray icon to configure settings, themes, widgets, or exit.
+#### Option 1: Installer (Recommended)
+1. Go to [Releases](https://github.com/Unknownplanet40/LivelyScreen/releases) and download **`LivelyScreen-Setup-win-x64.exe`**.
+2. Run the installer and follow the setup wizard.
+3. It creates Start Menu and Desktop shortcuts and can launch on Windows startup.
+
+#### Option 2: Portable ZIP
+1. Download **`LivelyScreen-win-x64.zip`**.
+2. Right-click the `.zip` and select **Extract All...**.
+3. Open the folder and run **`LivelyScreen.exe`**.
+
+#### Usage
+- LivelyScreen runs in your Windows System Tray (notification area).
+- Press **Win + Ctrl + S** at any time to launch the screensaver instantly.
+- Right-click the system tray icon to configure settings, themes, widgets, or exit.
 
 ---
 
