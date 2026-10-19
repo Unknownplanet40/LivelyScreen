@@ -18,21 +18,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemDefinitionGroup>
+    <Content>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemDefinitionGroup>
+
   <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
-    <Content Include="Assets\LockScreenLogo.scale-200.png" />
-    <Content Include="Assets\Square150x150Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
-    <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\AppIcon.ico" />
-    <Content Include="Assets\LogoMark.png" />
-    <Content Include="Assets\LogoMark-cropped.png" />
-    <Content Include="Assets\LogoMark.ico" />
-    <Content Include="Assets\AppTransparent.ico" />
-    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
-    <Content Include="Assets\Fonts\**" />
+    <Content Include="Assets\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -81,8 +75,7 @@
 
   <!-- Publish Properties -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
+    <PublishReadyToRun>False</PublishReadyToRun>
     <PublishTrimmed>False</PublishTrimmed>
     <AssemblyName>LivelyScreen</AssemblyName>
     <AssemblyTitle>LivelyScreen</AssemblyTitle>
@@ -92,4 +85,18 @@
     <Authors>Unknownplanet40</Authors>
     <PackageIcon>LogoMark.png</PackageIcon>
   </PropertyGroup>
+
+  <!-- Ensure WinUI 3 XAML resources and PRI files are included in unpackaged publish output -->
+  <Target Name="CopyWinUIResourcesToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)resources.pri" Condition="Exists('$(TargetDir)$(AssemblyName).pri')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFolder="$(PublishDir)" Condition="Exists('$(TargetDir)$(AssemblyName).pri')" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <_XbfFiles Include="$(TargetDir)**\*.xbf" />
+      <_OtherPriFiles Include="$(TargetDir)**\*.pri" Exclude="$(TargetDir)$(AssemblyName).pri" />
+      <_AssetFiles Include="$(ProjectDir)Assets\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_XbfFiles)" DestinationFolder="$(PublishDir)%(RecursiveDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_OtherPriFiles)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_AssetFiles)" DestinationFolder="$(PublishDir)Assets\%(RecursiveDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
