@@ -119,7 +119,16 @@ public class AppSettings
     public List<string> MediaFolders { get; set; } = new();
     public string ActiveSourcePath { get; set; } = "ALL"; // "ALL" or specific folder path
     public Dictionary<int, string> PerMonitorSourcePath { get; set; } = new();
-    public bool ShowWidgetsOnAllMonitors { get; set; } = false;
+    public int WidgetTargetDisplayIndex { get; set; } = -1; // -1 = Primary Only, -2 = All Monitors, >= 0 = Specific Monitor Index
+    public bool ShowWidgetsOnAllMonitors
+    {
+        get => WidgetTargetDisplayIndex == -2;
+        set
+        {
+            if (value) WidgetTargetDisplayIndex = -2;
+            else if (WidgetTargetDisplayIndex == -2) WidgetTargetDisplayIndex = -1;
+        }
+    }
 
     public string GetSourceForDisplay(int displayIndex)
     {
@@ -196,6 +205,9 @@ public class AppSettings
     // Shared Widget Palette Style (false = Win11 Calm Palette, true = System Accent Sync)
     public bool WidgetUseSystemAccent { get; set; } = false;
 
+    // Battery Status Badge
+    public bool BatteryWidgetEnabled { get; set; } = true;
+
     // Weather Widget
     public bool WeatherWidgetEnabled { get; set; } = false;
     public WidgetPosition WeatherPosition { get; set; } = WidgetPosition.BottomCenter;
@@ -266,5 +278,82 @@ public class AppSettings
     public int AmbientSoundVolume { get; set; } = 35; // 0 to 100%
     public string AmbientCustomAudioPath { get; set; } = "";
     public bool AmbientMusicShuffle { get; set; } = true;
+
+    // Independent Per-Monitor Widget Profiles
+    public Dictionary<int, MonitorWidgetProfile> PerMonitorWidgets { get; set; } = new();
+
+    public MonitorWidgetProfile GetWidgetProfileForDisplay(int displayIndex)
+    {
+        if (PerMonitorWidgets != null && PerMonitorWidgets.TryGetValue(displayIndex, out var p) && p != null)
+            return p;
+
+        if (displayIndex == 0)
+        {
+            return new MonitorWidgetProfile
+            {
+                ClockEnabled = ClockWidgetEnabled,
+                ClockPosition = ClockPosition,
+                WeatherEnabled = WeatherWidgetEnabled,
+                WeatherPosition = WeatherPosition,
+                MediaEnabled = MediaWidgetEnabled,
+                MediaPosition = MediaPosition,
+                PerformanceEnabled = PerformanceWidgetEnabled,
+                PerformancePosition = PerformancePosition,
+                CalendarEnabled = CalendarWidgetEnabled,
+                CalendarPosition = CalendarPosition,
+                QuoteEnabled = QuoteWidgetEnabled,
+                QuotePosition = QuotePosition
+            };
+        }
+
+        // Secondary monitors (Monitor 2, 3...) start completely empty by default
+        return new MonitorWidgetProfile
+        {
+            ClockEnabled = false,
+            ClockPosition = WidgetPosition.TopCenter,
+            WeatherEnabled = false,
+            WeatherPosition = WidgetPosition.BottomCenter,
+            MediaEnabled = false,
+            MediaPosition = WidgetPosition.BottomCenter,
+            PerformanceEnabled = false,
+            PerformancePosition = WidgetPosition.BottomCenter,
+            CalendarEnabled = false,
+            CalendarPosition = WidgetPosition.BottomCenter,
+            QuoteEnabled = false,
+            QuotePosition = WidgetPosition.Center
+        };
+    }
+
+    public MonitorWidgetProfile GetOrCreateWidgetProfileForDisplay(int displayIndex)
+    {
+        if (PerMonitorWidgets == null) PerMonitorWidgets = new();
+        if (!PerMonitorWidgets.TryGetValue(displayIndex, out var p) || p == null)
+        {
+            p = GetWidgetProfileForDisplay(displayIndex);
+            PerMonitorWidgets[displayIndex] = p;
+        }
+        return p;
+    }
+}
+
+public class MonitorWidgetProfile
+{
+    public bool ClockEnabled { get; set; } = true;
+    public WidgetPosition ClockPosition { get; set; } = WidgetPosition.TopCenter;
+
+    public bool WeatherEnabled { get; set; } = false;
+    public WidgetPosition WeatherPosition { get; set; } = WidgetPosition.BottomCenter;
+
+    public bool MediaEnabled { get; set; } = false;
+    public WidgetPosition MediaPosition { get; set; } = WidgetPosition.BottomCenter;
+
+    public bool PerformanceEnabled { get; set; } = false;
+    public WidgetPosition PerformancePosition { get; set; } = WidgetPosition.BottomCenter;
+
+    public bool CalendarEnabled { get; set; } = false;
+    public WidgetPosition CalendarPosition { get; set; } = WidgetPosition.BottomCenter;
+
+    public bool QuoteEnabled { get; set; } = false;
+    public WidgetPosition QuotePosition { get; set; } = WidgetPosition.Center;
 }
 

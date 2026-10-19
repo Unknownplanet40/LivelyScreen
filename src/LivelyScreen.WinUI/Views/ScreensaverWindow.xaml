@@ -85,6 +85,22 @@
                 <controls:StylizedQuoteWidget x:Name="QuoteWidgetControl" QuoteScale="1.0"/>
             </Grid>
 
+            <!-- Top-Right Acrylic Battery & Low-Power Indicator -->
+            <Border x:Name="BorderBatteryBadge"
+                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="0,32,40,0"
+                    Background="#59141720"
+                    BorderBrush="#25FFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="10,5,12,5"
+                    Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <FontIcon x:Name="IconBattery" Glyph="&#xEBAA;" FontSize="13" Foreground="#D0FFFFFF"/>
+                    <TextBlock x:Name="TxtBatteryPercent" Text="100%" FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="11.5" FontWeight="SemiBold" Foreground="#E0FFFFFF" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
             <!-- Windows 11 Lock-Screen Card Widgets Layer (9 Auto-Stacking Horizontal Zone Docks) -->
             <Grid x:Name="OverlayWidgetsLayer">
                 <StackPanel x:Name="ZoneStackTopLeft" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="56,48,0,0"/>

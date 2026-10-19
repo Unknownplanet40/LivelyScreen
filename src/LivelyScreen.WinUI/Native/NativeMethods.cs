@@ -86,10 +86,126 @@ public static class NativeMethods
     public const uint SWP_NOSIZE = 0x0001;
     public const uint SWP_NOMOVE = 0x0002;
     public const uint SWP_NOZORDER = 0x0004;
+    public const uint SWP_NOACTIVATE = 0x0010;
     public const uint SWP_FRAMECHANGED = 0x0020;
     public const uint SWP_SHOWWINDOW = 0x0040;
     public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
     public static readonly IntPtr HWND_TOP = new IntPtr(0);
+    public static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindowEx(IntPtr hWndParent, IntPtr hWndChildAfter, string? lpszClass, string? lpszWindow);
+
+    [DllImport("user32.dll")]
+    public static extern bool BringWindowToTop(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [ComImport]
+    [Guid("56FDF344-FD6D-11d0-958A-006097C9A090")]
+    [ClassInterface(ClassInterfaceType.None)]
+    private class TaskbarInstance
+    {
+    }
+
+    [ComImport]
+    [Guid("602D4995-B13A-429B-A66E-1935E44F4317")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface ITaskbarList2
+    {
+        [PreserveSig]
+        int HrInit();
+        [PreserveSig]
+        int AddTab(IntPtr hWnd);
+        [PreserveSig]
+        int DeleteTab(IntPtr hWnd);
+        [PreserveSig]
+        int ActivateTab(IntPtr hWnd);
+        [PreserveSig]
+        int SetActiveAlt(IntPtr hWnd);
+        [PreserveSig]
+        int MarkFullscreenWindow(IntPtr hWnd, [MarshalAs(UnmanagedType.Bool)] bool fFullscreen);
+    }
+
+    public static void MarkFullscreen(IntPtr hWnd, bool fullscreen)
+    {
+        if (hWnd == IntPtr.Zero) return;
+        try
+        {
+            var taskbarList = (ITaskbarList2)new TaskbarInstance();
+            taskbarList.HrInit();
+            taskbarList.MarkFullscreenWindow(hWnd, fullscreen);
+            Marshal.ReleaseComObject(taskbarList);
+        }
+        catch (Exception ex)
+        {
+            LivelyScreen_WinUI.App.Log($"MarkFullscreen error: {ex.Message}");
+        }
+    }
+
+    public static void ForceForegroundWindow(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return;
+        IntPtr fgWnd = GetForegroundWindow();
+        if (fgWnd == hWnd) return;
+
+        uint fgThread = GetWindowThreadProcessId(fgWnd, IntPtr.Zero);
+        uint curThread = GetCurrentThreadId();
+
+        bool attached = false;
+        try
+        {
+            if (fgThread != 0 && fgThread != curThread)
+            {
+                attached = AttachThreadInput(curThread, fgThread, true);
+            }
+            BringWindowToTop(hWnd);
+            SetForegroundWindow(hWnd);
+        }
+        catch { }
+        finally
+        {
+            if (attached)
+            {
+                AttachThreadInput(curThread, fgThread, false);
+            }
+        }
+    }
+
+    public static void SuppressTaskbars(IntPtr screensaverHwnd)
+    {
+        if (screensaverHwnd == IntPtr.Zero) return;
+
+        // Re-assert screensaver window at top of topmost Z-order
+        SetWindowPos(screensaverHwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+        // Put primary taskbar behind screensaver window
+        IntPtr primaryTray = FindWindow("Shell_TrayWnd", null);
+        if (primaryTray != IntPtr.Zero && primaryTray != screensaverHwnd)
+        {
+            SetWindowPos(primaryTray, screensaverHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+
+        // Put secondary taskbars behind screensaver window
+        IntPtr secTray = IntPtr.Zero;
+        while ((secTray = FindWindowEx(IntPtr.Zero, secTray, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
+        {
+            if (secTray != screensaverHwnd)
+            {
+                SetWindowPos(secTray, screensaverHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+        }
+    }
 
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
@@ -194,6 +310,7 @@ public static class NativeMethods
     public const int WM_DESTROY = 0x0002;
     public const int WM_SETTINGCHANGE = 0x001A;
     public const int WM_THEMECHANGED = 0x031A;
+    public const int WM_DISPLAYCHANGE = 0x007E;
     public const uint WM_NULL = 0x0000;
 
     // --- UXTheme & DWM Dark Mode APIs ---

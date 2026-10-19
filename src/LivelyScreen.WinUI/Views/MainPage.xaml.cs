@@ -24,6 +24,7 @@ public sealed partial class MainPage : Page
     private Window? _window;
     private IntPtr _windowHandle = IntPtr.Zero;
     private bool _isInitializing = true;
+    private int _currentEditingDisplayIndex = 0;
 
     public event Action? ThemePreferenceChanged;
     public event Action? ScreensaverRequested;
@@ -161,7 +162,21 @@ public sealed partial class MainPage : Page
         ComboAppTheme.SelectedIndex = (int)s.ThemePreference;
 
         ToggleWidgetsEnabled.IsOn = s.WidgetsEnabled;
-        ToggleWidgetsAllMonitors.IsOn = s.ShowWidgetsOnAllMonitors;
+        if (ComboWidgetTargetDisplay != null)
+        {
+            var savedWidgetTarget = s.WidgetTargetDisplayIndex;
+            int selectedWidgetIndex = 0;
+            for (int i = 0; i < ComboWidgetTargetDisplay.Items.Count; i++)
+            {
+                if (ComboWidgetTargetDisplay.Items[i] is ComboBoxItem cbi && cbi.Tag is int tag && tag == savedWidgetTarget)
+                {
+                    selectedWidgetIndex = i;
+                    break;
+                }
+            }
+            ComboWidgetTargetDisplay.SelectedIndex = selectedWidgetIndex;
+        }
+        if (ToggleBatteryWidget != null) ToggleBatteryWidget.IsOn = s.BatteryWidgetEnabled;
         ToggleClockWidget.IsOn = s.ClockWidgetEnabled;
         ComboClockFont.SelectedIndex = s.ClockFontFamily switch
         {
@@ -376,6 +391,13 @@ public sealed partial class MainPage : Page
             }
 
             var savedIdx = _settingsService.Current.TargetDisplayIndex;
+            if (savedIdx >= displays.Count)
+            {
+                savedIdx = -1;
+                _settingsService.Current.TargetDisplayIndex = -1;
+                _settingsService.Save();
+            }
+
             int selectIndex = 0;
             for (int i = 0; i < ComboTargetDisplay.Items.Count; i++)
             {
@@ -386,7 +408,66 @@ public sealed partial class MainPage : Page
                 }
             }
             ComboTargetDisplay.SelectedIndex = selectIndex;
+
+            if (ComboWidgetTargetDisplay != null)
+            {
+                ComboWidgetTargetDisplay.Items.Clear();
+                ComboWidgetTargetDisplay.Items.Add(new ComboBoxItem { Content = "Primary Monitor Only", Tag = -1 });
+                ComboWidgetTargetDisplay.Items.Add(new ComboBoxItem { Content = "All Monitors", Tag = -2 });
+
+                for (int i = 0; i < displays.Count; i++)
+                {
+                    var d = displays[i];
+                    var isPrimary = d.IsPrimary ? " (Primary)" : "";
+                    var label = $"Monitor {i + 1}{isPrimary}: {d.OuterBounds.Width}x{d.OuterBounds.Height}";
+                    ComboWidgetTargetDisplay.Items.Add(new ComboBoxItem { Content = label, Tag = i });
+                }
+
+                var savedWidgetTarget = _settingsService.Current.WidgetTargetDisplayIndex;
+                if (savedWidgetTarget >= displays.Count)
+                {
+                    savedWidgetTarget = -1;
+                    _settingsService.Current.WidgetTargetDisplayIndex = -1;
+                    _settingsService.Save();
+                }
+
+                int selectedWidgetIndex = 0;
+                for (int i = 0; i < ComboWidgetTargetDisplay.Items.Count; i++)
+                {
+                    if (ComboWidgetTargetDisplay.Items[i] is ComboBoxItem cbi && cbi.Tag is int tag && tag == savedWidgetTarget)
+                    {
+                        selectedWidgetIndex = i;
+                        break;
+                    }
+                }
+                ComboWidgetTargetDisplay.SelectedIndex = selectedWidgetIndex;
+            }
+
+            if (ComboMockupDisplaySelector != null)
+            {
+                ComboMockupDisplaySelector.Items.Clear();
+                for (int i = 0; i < displays.Count; i++)
+                {
+                    var d = displays[i];
+                    var isPrimary = d.IsPrimary ? " (Primary)" : "";
+                    ComboMockupDisplaySelector.Items.Add(new ComboBoxItem
+                    {
+                        Content = $"Monitor {i + 1}{isPrimary}",
+                        Tag = i
+                    });
+                }
+                if (_currentEditingDisplayIndex >= displays.Count)
+                    _currentEditingDisplayIndex = 0;
+
+                ComboMockupDisplaySelector.SelectedIndex = _currentEditingDisplayIndex;
+                if (PanelMockupDisplaySelector != null)
+                {
+                    PanelMockupDisplaySelector.Visibility = displays.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
             PopulatePerMonitorSources(displays);
+            UpdateControlStates();
         }
         catch (Exception ex)
         {
@@ -475,6 +556,17 @@ public sealed partial class MainPage : Page
             _settingsService.Save();
             UpdateControlStates();
             App.Log($"TargetDisplayIndex set to: {targetIdx}");
+        }
+    }
+
+    private void OnMockupDisplaySelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing) return;
+        if (ComboMockupDisplaySelector?.SelectedItem is ComboBoxItem cbi && cbi.Tag is int idx)
+        {
+            _currentEditingDisplayIndex = idx;
+            UpdateAllWidgetPositionPreviews();
+            UpdateMiniMonitorWallpaper();
         }
     }
 
@@ -746,9 +838,73 @@ public sealed partial class MainPage : Page
             PanelPerMonitorRouting.Visibility = isIndependentMulti ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        if (ToggleWidgetsAllMonitors != null)
+        bool widgetsEnabled = ToggleWidgetsEnabled?.IsOn ?? false;
+        if (ComboWidgetTargetDisplay != null)
         {
-            ToggleWidgetsAllMonitors.IsEnabled = ToggleWidgetsEnabled?.IsOn ?? false;
+            ComboWidgetTargetDisplay.IsEnabled = widgetsEnabled && isAllDisplays;
+        }
+
+        if (CardWidgetTargetDisplay != null)
+        {
+            if (!isAllDisplays)
+            {
+                int targetIdx = _settingsService.Current.TargetDisplayIndex;
+                CardWidgetTargetDisplay.Description = $"Locked to Monitor {targetIdx + 1} (Target Monitor is not set to All Displays).";
+            }
+            else
+            {
+                CardWidgetTargetDisplay.Description = "Choose which monitor displays the clock and glanceable widgets.";
+            }
+        }
+
+        if (ComboMockupDisplaySelector != null && PanelMockupDisplaySelector != null)
+        {
+            var displays = DisplayArea.FindAll();
+            if (displays.Count <= 1)
+            {
+                PanelMockupDisplaySelector.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                PanelMockupDisplaySelector.Visibility = Visibility.Visible;
+
+                int lockedIdx = -1;
+                if (!isAllDisplays)
+                {
+                    lockedIdx = _settingsService.Current.TargetDisplayIndex;
+                }
+                else if (_settingsService.Current.WidgetTargetDisplayIndex >= 0)
+                {
+                    lockedIdx = _settingsService.Current.WidgetTargetDisplayIndex;
+                }
+                else if (_settingsService.Current.WidgetTargetDisplayIndex == -1) // Primary Only
+                {
+                    lockedIdx = 0;
+                }
+
+                if (lockedIdx >= 0 && lockedIdx < displays.Count)
+                {
+                    ComboMockupDisplaySelector.IsEnabled = false;
+                    if (_currentEditingDisplayIndex != lockedIdx)
+                    {
+                        _currentEditingDisplayIndex = lockedIdx;
+                        ComboMockupDisplaySelector.SelectedIndex = lockedIdx;
+                        UpdateAllWidgetPositionPreviews();
+                        UpdateMiniMonitorWallpaper();
+                    }
+                    ToolTipService.SetToolTip(ComboMockupDisplaySelector, $"Screen placement locked to Monitor {lockedIdx + 1}.");
+                }
+                else
+                {
+                    ComboMockupDisplaySelector.IsEnabled = true;
+                    ToolTipService.SetToolTip(ComboMockupDisplaySelector, "Choose which screen layout to edit.");
+                }
+            }
+        }
+
+        if (ToggleBatteryWidget != null)
+        {
+            ToggleBatteryWidget.IsEnabled = widgetsEnabled;
         }
 
         if (ToggleWidgetsEnabled != null)
@@ -859,7 +1015,8 @@ public sealed partial class MainPage : Page
                 if (perfOn) activeList.Add("Perf");
                 if (calOn) activeList.Add("Calendar");
                 if (quoteOn) activeList.Add("Quotes");
-                TxtStatusPlacement.Text = anyWidgetPlaced ? $"{string.Join(", ", activeList)} Active" : "No Widgets Placed";
+                TxtStatusPlacement.Text = anyWidgetPlaced ? $"{activeList.Count} Active" : "No Widgets";
+                ToolTipService.SetToolTip(TxtStatusPlacement, anyWidgetPlaced ? $"{string.Join(", ", activeList)} Active" : "No Widgets Placed");
             }
         }
     }
@@ -1257,7 +1414,11 @@ public sealed partial class MainPage : Page
         }
 
         s.WidgetsEnabled = ToggleWidgetsEnabled.IsOn;
-        s.ShowWidgetsOnAllMonitors = ToggleWidgetsAllMonitors?.IsOn ?? false;
+        if (ToggleBatteryWidget != null) s.BatteryWidgetEnabled = ToggleBatteryWidget.IsOn;
+        if (ComboWidgetTargetDisplay?.SelectedItem is ComboBoxItem widgetItem && widgetItem.Tag is int widgetTargetIdx)
+        {
+            s.WidgetTargetDisplayIndex = widgetTargetIdx;
+        }
         s.ClockWidgetEnabled = ToggleClockWidget.IsOn;
         s.ClockFontFamily = ComboClockFont.SelectedIndex switch
         {
@@ -1634,34 +1795,45 @@ public sealed partial class MainPage : Page
     {
         if (_settingsService?.Current == null) return;
         var s = _settingsService.Current;
+        var profile = s.GetOrCreateWidgetProfileForDisplay(_currentEditingDisplayIndex);
 
-        s.WidgetsEnabled = true;
-        s.ClockWidgetEnabled = true;
-        s.ClockPosition = WidgetPosition.TopCenter;
+        profile.ClockEnabled = true;
+        profile.ClockPosition = WidgetPosition.TopCenter;
+        profile.QuoteEnabled = true;
+        profile.QuotePosition = WidgetPosition.Center;
+        profile.WeatherEnabled = true;
+        profile.WeatherPosition = WidgetPosition.BottomCenter;
+        profile.CalendarEnabled = true;
+        profile.CalendarPosition = WidgetPosition.BottomCenter;
+        profile.MediaEnabled = true;
+        profile.MediaPosition = WidgetPosition.BottomCenter;
+        profile.PerformanceEnabled = true;
+        profile.PerformancePosition = WidgetPosition.BottomCenter;
 
-        // Literary Quotes stays independent at Center, separate from the Bottom-Center utility dock
-        s.QuoteWidgetEnabled = true;
-        s.QuotePosition = WidgetPosition.Center;
+        if (_currentEditingDisplayIndex == 0)
+        {
+            s.WidgetsEnabled = true;
+            s.ClockWidgetEnabled = true;
+            s.ClockPosition = WidgetPosition.TopCenter;
+            s.QuoteWidgetEnabled = true;
+            s.QuotePosition = WidgetPosition.Center;
+            s.WeatherWidgetEnabled = true;
+            s.WeatherPosition = WidgetPosition.BottomCenter;
+            s.CalendarWidgetEnabled = true;
+            s.CalendarPosition = WidgetPosition.BottomCenter;
+            s.MediaWidgetEnabled = true;
+            s.MediaPosition = WidgetPosition.BottomCenter;
+            s.PerformanceWidgetEnabled = true;
+            s.PerformancePosition = WidgetPosition.BottomCenter;
 
-        s.WeatherWidgetEnabled = true;
-        s.WeatherPosition = WidgetPosition.BottomCenter;
-
-        s.CalendarWidgetEnabled = true;
-        s.CalendarPosition = WidgetPosition.BottomCenter;
-
-        s.MediaWidgetEnabled = true;
-        s.MediaPosition = WidgetPosition.BottomCenter;
-
-        s.PerformanceWidgetEnabled = true;
-        s.PerformancePosition = WidgetPosition.BottomCenter;
-
-        if (ToggleWidgetsEnabled != null) ToggleWidgetsEnabled.IsOn = true;
-        if (ToggleClockWidget != null) ToggleClockWidget.IsOn = true;
-        if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = true;
-        if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = true;
-        if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = true;
-        if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = true;
-        if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = true;
+            if (ToggleWidgetsEnabled != null) ToggleWidgetsEnabled.IsOn = true;
+            if (ToggleClockWidget != null) ToggleClockWidget.IsOn = true;
+            if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = true;
+            if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = true;
+            if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = true;
+            if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = true;
+            if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = true;
+        }
 
         _settingsService.Save();
         UpdateControlStates();
@@ -1672,41 +1844,72 @@ public sealed partial class MainPage : Page
     {
         if (_settingsService?.Current == null) return;
         var s = _settingsService.Current;
+        var profile = s.GetOrCreateWidgetProfileForDisplay(_currentEditingDisplayIndex);
 
         switch (widget.ToLowerInvariant())
         {
             case "clock":
-                s.ClockPosition = pos;
-                s.ClockWidgetEnabled = true;
-                if (ToggleClockWidget != null) ToggleClockWidget.IsOn = true;
+                profile.ClockPosition = pos;
+                profile.ClockEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.ClockPosition = pos;
+                    s.ClockWidgetEnabled = true;
+                    if (ToggleClockWidget != null) ToggleClockWidget.IsOn = true;
+                }
                 break;
             case "weather":
-                s.WeatherPosition = pos;
-                s.WeatherWidgetEnabled = true;
-                if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = true;
+                profile.WeatherPosition = pos;
+                profile.WeatherEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.WeatherPosition = pos;
+                    s.WeatherWidgetEnabled = true;
+                    if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = true;
+                }
                 break;
             case "media":
-                s.MediaPosition = pos;
-                s.MediaWidgetEnabled = true;
-                if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = true;
+                profile.MediaPosition = pos;
+                profile.MediaEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.MediaPosition = pos;
+                    s.MediaWidgetEnabled = true;
+                    if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = true;
+                }
                 break;
             case "performance":
             case "perf":
-                s.PerformancePosition = pos;
-                s.PerformanceWidgetEnabled = true;
-                if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = true;
+                profile.PerformancePosition = pos;
+                profile.PerformanceEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.PerformancePosition = pos;
+                    s.PerformanceWidgetEnabled = true;
+                    if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = true;
+                }
                 break;
             case "calendar":
             case "cal":
-                s.CalendarPosition = pos;
-                s.CalendarWidgetEnabled = true;
-                if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = true;
+                profile.CalendarPosition = pos;
+                profile.CalendarEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.CalendarPosition = pos;
+                    s.CalendarWidgetEnabled = true;
+                    if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = true;
+                }
                 break;
             case "quote":
             case "quotes":
-                s.QuotePosition = pos;
-                s.QuoteWidgetEnabled = true;
-                if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = true;
+                profile.QuotePosition = pos;
+                profile.QuoteEnabled = true;
+                if (_currentEditingDisplayIndex == 0)
+                {
+                    s.QuotePosition = pos;
+                    s.QuoteWidgetEnabled = true;
+                    if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = true;
+                }
                 break;
         }
 
@@ -1717,8 +1920,20 @@ public sealed partial class MainPage : Page
 
     private void OnWidgetPositionClicked(object sender, RoutedEventArgs e)
     {
-        // Do NOT move or change widget positions on zone click.
-        // Positions are only changed when the user drags a badge or selects an action from the Flyout menu.
+        if (sender is FrameworkElement fe && fe.Tag is string tag && Enum.TryParse<WidgetPosition>(tag, out var pos))
+        {
+            string targetWidget = "Clock";
+            if (ComboSelectedWidgetTarget?.SelectedItem is ComboBoxItem cbi && cbi.Tag is string wTag)
+                targetWidget = wTag;
+
+            AssignWidgetToPosition(targetWidget, pos);
+
+            if (TxtStatusPlacement != null)
+            {
+                TxtStatusPlacement.Text = $"{targetWidget} placed";
+                ToolTipService.SetToolTip(TxtStatusPlacement, $"{targetWidget} placed at {pos}");
+            }
+        }
     }
 
     private void OnWidgetBadgeClicked(object sender, RoutedEventArgs e)
@@ -1726,34 +1941,59 @@ public sealed partial class MainPage : Page
         if (sender is FrameworkElement fe && fe.Tag is string tag && _settingsService?.Current != null)
         {
             var s = _settingsService.Current;
+            var profile = s.GetOrCreateWidgetProfileForDisplay(_currentEditingDisplayIndex);
             switch (tag.ToLowerInvariant())
             {
                 case "clock":
-                    s.ClockWidgetEnabled = !s.ClockWidgetEnabled;
-                    if (ToggleClockWidget != null) ToggleClockWidget.IsOn = s.ClockWidgetEnabled;
+                    profile.ClockEnabled = !profile.ClockEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.ClockWidgetEnabled = profile.ClockEnabled;
+                        if (ToggleClockWidget != null) ToggleClockWidget.IsOn = s.ClockWidgetEnabled;
+                    }
                     break;
                 case "weather":
-                    s.WeatherWidgetEnabled = !s.WeatherWidgetEnabled;
-                    if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = s.WeatherWidgetEnabled;
+                    profile.WeatherEnabled = !profile.WeatherEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.WeatherWidgetEnabled = profile.WeatherEnabled;
+                        if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = s.WeatherWidgetEnabled;
+                    }
                     break;
                 case "media":
-                    s.MediaWidgetEnabled = !s.MediaWidgetEnabled;
-                    if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = s.MediaWidgetEnabled;
+                    profile.MediaEnabled = !profile.MediaEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.MediaWidgetEnabled = profile.MediaEnabled;
+                        if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = s.MediaWidgetEnabled;
+                    }
                     break;
                 case "performance":
                 case "perf":
-                    s.PerformanceWidgetEnabled = !s.PerformanceWidgetEnabled;
-                    if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = s.PerformanceWidgetEnabled;
+                    profile.PerformanceEnabled = !profile.PerformanceEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.PerformanceWidgetEnabled = profile.PerformanceEnabled;
+                        if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = s.PerformanceWidgetEnabled;
+                    }
                     break;
                 case "calendar":
                 case "cal":
-                    s.CalendarWidgetEnabled = !s.CalendarWidgetEnabled;
-                    if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = s.CalendarWidgetEnabled;
+                    profile.CalendarEnabled = !profile.CalendarEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.CalendarWidgetEnabled = profile.CalendarEnabled;
+                        if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = s.CalendarWidgetEnabled;
+                    }
                     break;
                 case "quote":
                 case "quotes":
-                    s.QuoteWidgetEnabled = !s.QuoteWidgetEnabled;
-                    if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = s.QuoteWidgetEnabled;
+                    profile.QuoteEnabled = !profile.QuoteEnabled;
+                    if (_currentEditingDisplayIndex == 0)
+                    {
+                        s.QuoteWidgetEnabled = profile.QuoteEnabled;
+                        if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = s.QuoteWidgetEnabled;
+                    }
                     break;
             }
             _settingsService.Save();
@@ -1851,12 +2091,38 @@ public sealed partial class MainPage : Page
     {
         if (_settingsService?.Current == null) return;
         var s = _settingsService.Current;
-        if (s.ClockPosition == pos) { s.ClockWidgetEnabled = false; if (ToggleClockWidget != null) ToggleClockWidget.IsOn = false; }
-        if (s.WeatherPosition == pos) { s.WeatherWidgetEnabled = false; if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = false; }
-        if (s.MediaPosition == pos) { s.MediaWidgetEnabled = false; if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = false; }
-        if (s.PerformancePosition == pos) { s.PerformanceWidgetEnabled = false; if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = false; }
-        if (s.CalendarPosition == pos) { s.CalendarWidgetEnabled = false; if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = false; }
-        if (s.QuotePosition == pos) { s.QuoteWidgetEnabled = false; if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = false; }
+        var profile = s.GetOrCreateWidgetProfileForDisplay(_currentEditingDisplayIndex);
+
+        if (profile.ClockPosition == pos)
+        {
+            profile.ClockEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.ClockWidgetEnabled = false; if (ToggleClockWidget != null) ToggleClockWidget.IsOn = false; }
+        }
+        if (profile.WeatherPosition == pos)
+        {
+            profile.WeatherEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.WeatherWidgetEnabled = false; if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = false; }
+        }
+        if (profile.MediaPosition == pos)
+        {
+            profile.MediaEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.MediaWidgetEnabled = false; if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = false; }
+        }
+        if (profile.PerformancePosition == pos)
+        {
+            profile.PerformanceEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.PerformanceWidgetEnabled = false; if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = false; }
+        }
+        if (profile.CalendarPosition == pos)
+        {
+            profile.CalendarEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.CalendarWidgetEnabled = false; if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = false; }
+        }
+        if (profile.QuotePosition == pos)
+        {
+            profile.QuoteEnabled = false;
+            if (_currentEditingDisplayIndex == 0) { s.QuoteWidgetEnabled = false; if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = false; }
+        }
 
         _settingsService.Save();
         UpdateControlStates();
@@ -1876,20 +2142,31 @@ public sealed partial class MainPage : Page
         if (_settingsService?.Current != null)
         {
             var s = _settingsService.Current;
-            s.ClockWidgetEnabled = false;
-            s.WeatherWidgetEnabled = false;
-            s.MediaWidgetEnabled = false;
-            s.PerformanceWidgetEnabled = false;
-            s.CalendarWidgetEnabled = false;
-            s.QuoteWidgetEnabled = false;
+            var profile = s.GetOrCreateWidgetProfileForDisplay(_currentEditingDisplayIndex);
+            profile.ClockEnabled = false;
+            profile.WeatherEnabled = false;
+            profile.MediaEnabled = false;
+            profile.PerformanceEnabled = false;
+            profile.CalendarEnabled = false;
+            profile.QuoteEnabled = false;
+
+            if (_currentEditingDisplayIndex == 0)
+            {
+                s.ClockWidgetEnabled = false;
+                s.WeatherWidgetEnabled = false;
+                s.MediaWidgetEnabled = false;
+                s.PerformanceWidgetEnabled = false;
+                s.CalendarWidgetEnabled = false;
+                s.QuoteWidgetEnabled = false;
+                if (ToggleClockWidget != null) ToggleClockWidget.IsOn = false;
+                if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = false;
+                if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = false;
+                if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = false;
+                if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = false;
+                if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = false;
+            }
             _settingsService.Save();
         }
-        if (ToggleClockWidget != null) ToggleClockWidget.IsOn = false;
-        if (ToggleWeatherWidget != null) ToggleWeatherWidget.IsOn = false;
-        if (ToggleMediaWidget != null) ToggleMediaWidget.IsOn = false;
-        if (TogglePerformanceWidget != null) TogglePerformanceWidget.IsOn = false;
-        if (ToggleCalendarWidget != null) ToggleCalendarWidget.IsOn = false;
-        if (ToggleQuoteWidget != null) ToggleQuoteWidget.IsOn = false;
 
         UpdateControlStates();
         UpdateAllWidgetPositionPreviews();
@@ -1952,18 +2229,46 @@ public sealed partial class MainPage : Page
         var s = _settingsService?.Current;
         if (s == null) return;
 
+        var profile = s.GetWidgetProfileForDisplay(_currentEditingDisplayIndex);
         bool widgetsGlobalOn = ToggleWidgetsEnabled?.IsOn ?? s.WidgetsEnabled;
-        bool clockOn = widgetsGlobalOn && (ToggleClockWidget?.IsOn ?? s.ClockWidgetEnabled);
-        bool weatherOn = widgetsGlobalOn && (ToggleWeatherWidget?.IsOn ?? s.WeatherWidgetEnabled);
-        bool mediaOn = widgetsGlobalOn && (ToggleMediaWidget?.IsOn ?? s.MediaWidgetEnabled);
-        bool perfOn = widgetsGlobalOn && (TogglePerformanceWidget?.IsOn ?? s.PerformanceWidgetEnabled);
-        bool calOn = widgetsGlobalOn && (ToggleCalendarWidget?.IsOn ?? s.CalendarWidgetEnabled);
-        bool quoteOn = widgetsGlobalOn && (ToggleQuoteWidget?.IsOn ?? s.QuoteWidgetEnabled);
+        bool clockOn = widgetsGlobalOn && profile.ClockEnabled;
+        bool weatherOn = widgetsGlobalOn && profile.WeatherEnabled;
+        bool mediaOn = widgetsGlobalOn && profile.MediaEnabled;
+        bool perfOn = widgetsGlobalOn && profile.PerformanceEnabled;
+        bool calOn = widgetsGlobalOn && profile.CalendarEnabled;
+        bool quoteOn = widgetsGlobalOn && profile.QuoteEnabled;
+
+        var accentBrush = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+        var subtleBrush = (Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"];
+
+        if (BadgeClockWidget != null) BadgeClockWidget.Opacity = clockOn ? 1.0 : 0.55;
+        if (BadgePillClock != null) BadgePillClock.Background = clockOn ? accentBrush : subtleBrush;
+        if (TxtBadgeClockState != null) TxtBadgeClockState.Text = clockOn ? "Active" : "Off";
+
+        if (BadgeWeatherWidget != null) BadgeWeatherWidget.Opacity = weatherOn ? 1.0 : 0.55;
+        if (BadgePillWeather != null) BadgePillWeather.Background = weatherOn ? accentBrush : subtleBrush;
+        if (TxtBadgeWeatherState != null) TxtBadgeWeatherState.Text = weatherOn ? "Active" : "Off";
+
+        if (BadgeMediaWidget != null) BadgeMediaWidget.Opacity = mediaOn ? 1.0 : 0.55;
+        if (BadgePillMedia != null) BadgePillMedia.Background = mediaOn ? accentBrush : subtleBrush;
+        if (TxtBadgeMediaState != null) TxtBadgeMediaState.Text = mediaOn ? "Active" : "Off";
+
+        if (BadgePerformanceWidget != null) BadgePerformanceWidget.Opacity = perfOn ? 1.0 : 0.55;
+        if (BadgePillPerf != null) BadgePillPerf.Background = perfOn ? accentBrush : subtleBrush;
+        if (TxtBadgePerfState != null) TxtBadgePerfState.Text = perfOn ? "Active" : "Off";
+
+        if (BadgeCalendarWidget != null) BadgeCalendarWidget.Opacity = calOn ? 1.0 : 0.55;
+        if (BadgePillCal != null) BadgePillCal.Background = calOn ? accentBrush : subtleBrush;
+        if (TxtBadgeCalState != null) TxtBadgeCalState.Text = calOn ? "Active" : "Off";
+
+        if (BadgeQuoteWidget != null) BadgeQuoteWidget.Opacity = quoteOn ? 1.0 : 0.55;
+        if (BadgePillQuote != null) BadgePillQuote.Background = quoteOn ? accentBrush : subtleBrush;
+        if (TxtBadgeQuoteState != null) TxtBadgeQuoteState.Text = quoteOn ? "Active" : "Off";
 
         // Clock Mini Preview
         if (MiniPreviewClockWidget != null)
         {
-            var (row, col) = GetPositionRowCol(s.ClockPosition);
+            var (row, col) = GetPositionRowCol(profile.ClockPosition);
             Grid.SetRow(MiniPreviewClockWidget, row);
             Grid.SetColumn(MiniPreviewClockWidget, col);
             MiniPreviewClockWidget.ClockFontFamily = s.ClockFontFamily ?? "Segoe UI Variable Display";
@@ -1987,7 +2292,7 @@ public sealed partial class MainPage : Page
             MiniPreviewWeatherWidget.CityName = s.WeatherCity ?? "Auto";
             MiniPreviewWeatherWidget.UseFahrenheit = s.WeatherUseFahrenheit;
             MiniPreviewWeatherWidget.UseSystemAccent = s.WidgetUseSystemAccent;
-            PlaceMiniPreviewInZone(MiniPreviewWeatherWidget, s.WeatherPosition);
+            PlaceMiniPreviewInZone(MiniPreviewWeatherWidget, profile.WeatherPosition);
             MiniPreviewWeatherWidget.Visibility = weatherOn ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -2000,7 +2305,7 @@ public sealed partial class MainPage : Page
             MiniPreviewCalendarWidget.ShowEventNote = s.CalendarShowEventNote;
             MiniPreviewCalendarWidget.CustomNote = s.CalendarCustomNote ?? "No upcoming calendar conflicts";
             MiniPreviewCalendarWidget.DateFormatStyle = s.CalendarDateFormat;
-            PlaceMiniPreviewInZone(MiniPreviewCalendarWidget, s.CalendarPosition);
+            PlaceMiniPreviewInZone(MiniPreviewCalendarWidget, profile.CalendarPosition);
             MiniPreviewCalendarWidget.Visibility = calOn ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -2030,7 +2335,7 @@ public sealed partial class MainPage : Page
         // Wisdom & Quotes Mini Preview (Independent Literary Overlay — Grid cell placement like Clock)
         if (MiniPreviewQuoteWidget != null)
         {
-            var (qRow, qCol) = GetPositionRowCol(s.QuotePosition);
+            var (qRow, qCol) = GetPositionRowCol(profile.QuotePosition);
             Grid.SetRow(MiniPreviewQuoteWidget, qRow);
             Grid.SetColumn(MiniPreviewQuoteWidget, qCol);
             MiniPreviewQuoteWidget.CardWidth = s.QuoteCardWidth;
@@ -2063,7 +2368,7 @@ public sealed partial class MainPage : Page
             MiniPreviewMediaWidget.ShowAlbumArt = s.MediaShowAlbumArt;
             MiniPreviewMediaWidget.HideWhenIdle = s.MediaHideWhenIdle;
             MiniPreviewMediaWidget.IdleText = s.MediaIdleText ?? "Ready for Music";
-            PlaceMiniPreviewInZone(MiniPreviewMediaWidget, s.MediaPosition);
+            PlaceMiniPreviewInZone(MiniPreviewMediaWidget, profile.MediaPosition);
             MiniPreviewMediaWidget.ApplyVisibilityState();
         }
 
@@ -2076,7 +2381,7 @@ public sealed partial class MainPage : Page
             MiniPreviewPerformanceWidget.ShowRam = s.PerformanceShowRam;
             MiniPreviewPerformanceWidget.ShowPercentages = s.PerformanceShowPercentages;
             MiniPreviewPerformanceWidget.HighlightThreshold = s.PerformanceHighlightThreshold;
-            PlaceMiniPreviewInZone(MiniPreviewPerformanceWidget, s.PerformancePosition);
+            PlaceMiniPreviewInZone(MiniPreviewPerformanceWidget, profile.PerformancePosition);
             MiniPreviewPerformanceWidget.Visibility = perfOn ? Visibility.Visible : Visibility.Collapsed;
         }
 
@@ -2100,12 +2405,12 @@ public sealed partial class MainPage : Page
         {
             if (btn == null) continue;
 
-            bool isZoneOccupied = (clockOn && s.ClockPosition == zonePos)
-                               || (weatherOn && s.WeatherPosition == zonePos)
-                               || (mediaOn && s.MediaPosition == zonePos)
-                               || (perfOn && s.PerformancePosition == zonePos)
-                               || (calOn && s.CalendarPosition == zonePos)
-                               || (quoteOn && s.QuotePosition == zonePos);
+            bool isZoneOccupied = (clockOn && profile.ClockPosition == zonePos)
+                               || (weatherOn && profile.WeatherPosition == zonePos)
+                               || (mediaOn && profile.MediaPosition == zonePos)
+                               || (perfOn && profile.PerformancePosition == zonePos)
+                               || (calOn && profile.CalendarPosition == zonePos)
+                               || (quoteOn && profile.QuotePosition == zonePos);
 
             if (dot != null) dot.Visibility = isZoneOccupied ? Visibility.Collapsed : Visibility.Visible;
 
@@ -2142,7 +2447,8 @@ public sealed partial class MainPage : Page
             if (perfOn) activeItems.Add("Perf");
             if (calOn) activeItems.Add("Calendar");
             if (quoteOn) activeItems.Add("Quotes");
-            TxtStatusPlacement.Text = anyWidgetPlaced ? $"{string.Join(", ", activeItems)} Active" : "No Widgets Placed";
+            TxtStatusPlacement.Text = anyWidgetPlaced ? $"{activeItems.Count} Active" : "No Widgets";
+            ToolTipService.SetToolTip(TxtStatusPlacement, anyWidgetPlaced ? $"{string.Join(", ", activeItems)} Active" : "No Widgets Placed");
         }
     }
 

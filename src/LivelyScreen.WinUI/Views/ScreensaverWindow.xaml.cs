@@ -33,6 +33,8 @@ public sealed partial class ScreensaverWindow : Window
     private readonly DispatcherTimer _clockShuffleTimer;
     private readonly DispatcherTimer _oledShiftTimer;
     private readonly DispatcherTimer _blackoutStageTimer;
+    private readonly DispatcherTimer _taskbarWatchdogTimer;
+    private IntPtr _windowHandle = IntPtr.Zero;
     private double _oledShiftAngle = 0;
     private bool _isSecondStageBlackout = false;
     private WidgetPosition _currentShufflePosition;
@@ -89,10 +91,19 @@ public sealed partial class ScreensaverWindow : Window
         _blackoutStageTimer = new DispatcherTimer();
         _blackoutStageTimer.Tick += OnBlackoutStageTick;
 
+        _taskbarWatchdogTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+        _taskbarWatchdogTimer.Tick += (_, _) =>
+        {
+            if (!_isClosing && _windowHandle != IntPtr.Zero)
+            {
+                NativeMethods.SuppressTaskbars(_windowHandle);
+            }
+        };
+
         _currentShufflePosition = _settingsService.Current.ClockPosition;
         ApplyClockPosition(_currentShufflePosition);
         UpdateClockWidget();
-        bool canShowWidgets = _isPrimary || _settingsService.Current.ShowWidgetsOnAllMonitors;
+        bool canShowWidgets = CanDisplayWidgets();
         if (canShowWidgets && !_isBlackout)
         {
             _clockTimer.Start();
@@ -138,6 +149,7 @@ public sealed partial class ScreensaverWindow : Window
             AppWindow.MoveAndResize(_bounds);
 
             var hWnd = WindowNative.GetWindowHandle(this);
+            _windowHandle = hWnd;
             if (hWnd != IntPtr.Zero)
             {
                 // Force pure borderless POPUP style on Win32 window level
@@ -204,6 +216,17 @@ public sealed partial class ScreensaverWindow : Window
                 {
                     NativeMethods.SetWindowRgn(hWnd, hRgn, true);
                 }
+
+                // Tell Windows Shell to treat window as fullscreen to suppress taskbar
+                NativeMethods.MarkFullscreen(hWnd, true);
+
+                if (IsMaster || _isPrimary)
+                {
+                    NativeMethods.ForceForegroundWindow(hWnd);
+                }
+
+                NativeMethods.SuppressTaskbars(hWnd);
+                _taskbarWatchdogTimer.Start();
             }
 
             _activationTime = DateTime.UtcNow;
@@ -234,12 +257,25 @@ public sealed partial class ScreensaverWindow : Window
 
     private IntPtr BorderlessSubclass(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
+        const uint WM_ACTIVATE = 0x0006;
         const uint WM_NCCALCSIZE = 0x0083;
         const uint WM_NCPAINT = 0x0085;
         const uint WM_NCACTIVATE = 0x0086;
 
         switch (uMsg)
         {
+            case WM_ACTIVATE:
+                if (wParam == IntPtr.Zero && !_isClosing)
+                {
+                    // Focus lost to taskbar or background window; ensure taskbar remains behind screensaver
+                    NativeMethods.SuppressTaskbars(hWnd);
+                }
+                break;
+
+            case (uint)NativeMethods.WM_DISPLAYCHANGE:
+                TriggerDismiss();
+                break;
+
             case WM_NCCALCSIZE:
                 // Returning 0 indicates client area occupies 100% of the window rectangle, leaving 0 non-client pixels
                 return IntPtr.Zero;
@@ -354,6 +390,10 @@ public sealed partial class ScreensaverWindow : Window
         }
 
         UpdateMediaInfoPill(item);
+        if (_windowHandle != IntPtr.Zero && !_isClosing)
+        {
+            NativeMethods.SuppressTaskbars(_windowHandle);
+        }
     }
 
     public void AdvanceToNextMedia(bool initial = false)
@@ -788,8 +828,13 @@ public sealed partial class ScreensaverWindow : Window
         _clockShuffleTimer.Stop();
         _oledShiftTimer.Stop();
         _blackoutStageTimer.Stop();
+        _taskbarWatchdogTimer.Stop();
 
         var hWnd = WindowNative.GetWindowHandle(this);
+        if (hWnd != IntPtr.Zero)
+        {
+            NativeMethods.MarkFullscreen(hWnd, false);
+        }
         var startTime = DateTime.UtcNow;
         const double durationMs = 350.0;
 
@@ -845,14 +890,41 @@ public sealed partial class ScreensaverWindow : Window
         timer.Start();
     }
 
+    private bool CanDisplayWidgets()
+    {
+        var s = _settingsService.Current;
+
+        // When a specific display is targeted (not All Displays), show widgets on that targeted active monitor
+        if (s.TargetDisplayIndex >= 0)
+        {
+            return DisplayIndex == s.TargetDisplayIndex;
+        }
+
+        int target = s.WidgetTargetDisplayIndex;
+        if (target == -2) return true; // All Monitors
+        if (target == -1) return _isPrimary; // Primary Only
+        if (target >= 0)
+        {
+            var displays = DisplayArea.FindAll();
+            if (target < displays.Count)
+            {
+                return DisplayIndex == target;
+            }
+            // Target monitor is disconnected/unavailable; gracefully fall back to primary
+            return _isPrimary;
+        }
+        return _isPrimary;
+    }
+
     private void UpdateClockWidget() => UpdateAllWidgets();
 
     private void UpdateAllWidgets()
     {
         ApplyVisualFilters();
         var s = _settingsService.Current;
-        bool canShowWidgets = _isPrimary || s.ShowWidgetsOnAllMonitors;
+        bool canShowWidgets = CanDisplayWidgets();
         bool enabled = s.WidgetsEnabled && canShowWidgets && !_isBlackout;
+        var profile = s.GetWidgetProfileForDisplay(DisplayIndex);
 
         if (OverlayWidgetsLayer != null)
         {
@@ -860,7 +932,7 @@ public sealed partial class ScreensaverWindow : Window
         }
 
         // Clock Widget
-        if (!enabled || !s.ClockWidgetEnabled)
+        if (!enabled || !profile.ClockEnabled)
         {
             if (OverlayClockWidget != null) OverlayClockWidget.Visibility = Visibility.Collapsed;
             _clockShuffleTimer.Stop();
@@ -881,14 +953,14 @@ public sealed partial class ScreensaverWindow : Window
                 ClockWidgetControl.ShowGlassPill = s.ShowGlassPill;
                 ClockWidgetControl.GlassPillOpacity = s.GlassPillOpacity;
                 ClockWidgetControl.ClockScale = s.ClockScale;
-                ApplyClockPosition(s.ClockPosition);
+                ApplyClockPosition(profile.ClockPosition);
             }
         }
 
         // Weather Widget
         if (WeatherWidgetControl != null)
         {
-            if (!enabled || !s.WeatherWidgetEnabled)
+            if (!enabled || !profile.WeatherEnabled)
             {
                 WeatherWidgetControl.Visibility = Visibility.Collapsed;
             }
@@ -898,7 +970,7 @@ public sealed partial class ScreensaverWindow : Window
                 WeatherWidgetControl.UseFahrenheit = s.WeatherUseFahrenheit;
                 WeatherWidgetControl.WeatherScale = s.WeatherScale;
                 WeatherWidgetControl.UseSystemAccent = s.WidgetUseSystemAccent;
-                PlaceCardInZone(WeatherWidgetControl, s.WeatherPosition);
+                PlaceCardInZone(WeatherWidgetControl, profile.WeatherPosition);
                 WeatherWidgetControl.Visibility = Visibility.Visible;
             }
         }
@@ -906,7 +978,7 @@ public sealed partial class ScreensaverWindow : Window
         // Calendar / Agenda Widget
         if (CalendarWidgetControl != null)
         {
-            if (!enabled || !s.CalendarWidgetEnabled)
+            if (!enabled || !profile.CalendarEnabled)
             {
                 CalendarWidgetControl.Visibility = Visibility.Collapsed;
             }
@@ -920,7 +992,7 @@ public sealed partial class ScreensaverWindow : Window
                 CalendarWidgetControl.DateFormatStyle = s.CalendarDateFormat;
                 CalendarWidgetControl.UseLiveEvents = s.CalendarUseLiveEvents;
                 CalendarWidgetControl.IcsUrlOrPath = s.CalendarIcsUrlOrPath;
-                PlaceCardInZone(CalendarWidgetControl, s.CalendarPosition);
+                PlaceCardInZone(CalendarWidgetControl, profile.CalendarPosition);
                 CalendarWidgetControl.Visibility = Visibility.Visible;
             }
         }
@@ -928,7 +1000,7 @@ public sealed partial class ScreensaverWindow : Window
         // Media / Now Playing Widget
         if (MediaWidgetControl != null)
         {
-            bool mediaEnabled = enabled && s.MediaWidgetEnabled;
+            bool mediaEnabled = enabled && profile.MediaEnabled;
             MediaWidgetControl.IsWidgetEnabled = mediaEnabled;
             if (!mediaEnabled)
             {
@@ -942,7 +1014,7 @@ public sealed partial class ScreensaverWindow : Window
                 MediaWidgetControl.HideWhenIdle = s.MediaHideWhenIdle;
                 MediaWidgetControl.IdleText = s.MediaIdleText;
                 MediaWidgetControl.AudioSpectrumEnabled = s.AudioSpectrumEnabled;
-                PlaceCardInZone(MediaWidgetControl, s.MediaPosition);
+                PlaceCardInZone(MediaWidgetControl, profile.MediaPosition);
                 MediaWidgetControl.ApplyVisibilityState();
             }
         }
@@ -950,7 +1022,7 @@ public sealed partial class ScreensaverWindow : Window
         // Performance Monitor Widget
         if (PerformanceWidgetControl != null)
         {
-            if (!enabled || !s.PerformanceWidgetEnabled)
+            if (!enabled || !profile.PerformanceEnabled)
             {
                 PerformanceWidgetControl.Visibility = Visibility.Collapsed;
             }
@@ -963,7 +1035,7 @@ public sealed partial class ScreensaverWindow : Window
                 PerformanceWidgetControl.ShowPercentages = s.PerformanceShowPercentages;
                 PerformanceWidgetControl.HighlightThreshold = s.PerformanceHighlightThreshold;
                 PerformanceWidgetControl.RefreshIntervalSeconds = s.PerformanceRefreshIntervalSeconds;
-                PlaceCardInZone(PerformanceWidgetControl, s.PerformancePosition);
+                PlaceCardInZone(PerformanceWidgetControl, profile.PerformancePosition);
                 PerformanceWidgetControl.Visibility = Visibility.Visible;
             }
         }
@@ -976,7 +1048,7 @@ public sealed partial class ScreensaverWindow : Window
             _settingsService.Save();
         }
 
-        if (!enabled || !s.QuoteWidgetEnabled)
+        if (!enabled || !profile.QuoteEnabled)
         {
             if (OverlayQuoteWidget != null) OverlayQuoteWidget.Visibility = Visibility.Collapsed;
             if (QuoteWidgetControl != null) QuoteWidgetControl.Visibility = Visibility.Collapsed;
@@ -1004,8 +1076,27 @@ public sealed partial class ScreensaverWindow : Window
                 QuoteWidgetControl.ShowMeaning = s.QuoteShowMeaning;
                 QuoteWidgetControl.DatabasePath = s.QuoteDatabasePath;
                 QuoteWidgetControl.RotationIntervalSeconds = s.QuoteRotationIntervalSeconds;
-                ApplyElementPosition(QuoteWidgetControl, s.QuotePosition);
+                ApplyElementPosition(QuoteWidgetControl, profile.QuotePosition);
                 QuoteWidgetControl.Visibility = Visibility.Visible;
+            }
+        }
+
+        // Battery Status Indicator
+        if (BorderBatteryBadge != null)
+        {
+            if (!s.WidgetsEnabled || !s.BatteryWidgetEnabled || !canShowWidgets || _isBlackout || !NativeMethods.GetSystemPowerStatus(out var pStatus) || pStatus.BatteryFlag == 128 || pStatus.BatteryLifePercent > 100)
+            {
+                BorderBatteryBadge.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                BorderBatteryBadge.Visibility = Visibility.Visible;
+                TxtBatteryPercent.Text = $"{pStatus.BatteryLifePercent}%";
+                bool isCharging = pStatus.ACLineStatus == 1;
+                IconBattery.Glyph = isCharging ? "\uEA93" : (pStatus.BatteryLifePercent > 60 ? "\uEBAA" : (pStatus.BatteryLifePercent > 20 ? "\uEBA6" : "\uEBA0"));
+                TxtBatteryPercent.Foreground = (!isCharging && pStatus.BatteryLifePercent <= 20)
+                    ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 100, 100))
+                    : new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 238, 238, 238));
             }
         }
     }
@@ -1119,7 +1210,7 @@ public sealed partial class ScreensaverWindow : Window
         if (BorderMediaInfo == null || TxtMediaInfo == null) return;
 
         var s = _settingsService.Current;
-        bool canShow = (_isPrimary || s.ShowWidgetsOnAllMonitors) && s.ShowMediaInfoPill && !_isBlackout;
+        bool canShow = CanDisplayWidgets() && s.ShowMediaInfoPill && !_isBlackout;
         if (!canShow)
         {
             BorderMediaInfo.Visibility = Visibility.Collapsed;
@@ -1219,7 +1310,7 @@ public sealed partial class ScreensaverWindow : Window
     private void StartOledShiftTimer()
     {
         _oledShiftTimer.Stop();
-        bool canShowWidgets = _isPrimary || _settingsService.Current.ShowWidgetsOnAllMonitors;
+        bool canShowWidgets = CanDisplayWidgets();
         if (!_settingsService.Current.OledPixelShiftEnabled || !canShowWidgets || _isBlackout)
             return;
         _oledShiftTimer.Start();
@@ -1323,7 +1414,7 @@ public sealed partial class ScreensaverWindow : Window
     {
         _clockShuffleTimer.Stop();
         var s = _settingsService.Current;
-        bool canShowWidgets = _isPrimary || s.ShowWidgetsOnAllMonitors;
+        bool canShowWidgets = CanDisplayWidgets();
         if (!s.WidgetsEnabled || !s.ClockWidgetEnabled || !s.ClockShuffleEnabled || !canShowWidgets || _isBlackout)
             return;
 

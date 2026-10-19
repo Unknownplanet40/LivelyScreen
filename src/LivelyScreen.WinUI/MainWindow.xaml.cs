@@ -231,6 +231,19 @@ public sealed partial class MainWindow : Window
                 DispatcherQueue.TryEnqueue(() => ApplyThemePreference());
             }
         }
+        else if (uMsg == (uint)NativeMethods.WM_DISPLAYCHANGE)
+        {
+            App.Log("WindowSubclassHandler received WM_DISPLAYCHANGE.");
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (_screensaverManager.IsActive)
+                {
+                    App.Log("WM_DISPLAYCHANGE: Dismissing screensaver due to display topology change.");
+                    _screensaverManager.StopScreensaver();
+                }
+                MainView?.UpdateScreenInfo();
+            });
+        }
         else if (uMsg == (uint)NativeMethods.WM_DESTROY)
         {
             if (_subclassProc != null)

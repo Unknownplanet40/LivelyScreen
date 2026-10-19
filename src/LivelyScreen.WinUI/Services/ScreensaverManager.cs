@@ -128,8 +128,8 @@ public class ScreensaverManager
                             }
                         }
 
-                        // Activate all windows
-                        foreach (var win in _activeWindows)
+                        // Activate all windows, activating master window last for foreground ownership
+                        foreach (var win in _activeWindows.OrderBy(w => w.IsMaster ? 1 : 0))
                         {
                             win.Activate();
                         }

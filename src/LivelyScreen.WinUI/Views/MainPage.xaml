@@ -746,8 +746,12 @@
                             <ToggleSwitch x:Name="ToggleWidgetsEnabled" Toggled="OnSettingChanged"/>
                         </labs:SettingsCard>
 
-                        <labs:SettingsCard Header="Show Widgets on All Monitors" Description="Display clock and widgets across every connected display instead of only primary monitor.">
-                            <ToggleSwitch x:Name="ToggleWidgetsAllMonitors" Toggled="OnSettingChanged"/>
+                        <labs:SettingsCard x:Name="CardWidgetTargetDisplay" Header="Widget Display Screen" Description="Choose which monitor displays the clock and glanceable widgets.">
+                            <ComboBox x:Name="ComboWidgetTargetDisplay" SelectionChanged="OnSettingChanged" Width="260"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Battery Status Badge" Description="Show current battery percentage and charging state in the top-right corner of the screensaver.">
+                            <ToggleSwitch x:Name="ToggleBatteryWidget" Toggled="OnSettingChanged"/>
                         </labs:SettingsCard>
 
                         <!-- ACTIVE WIDGET MODULES -->
@@ -1370,8 +1374,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xE823;" FontSize="13" Foreground="#D0FFFFFF"/>
                                                     <TextBlock Text="Clock" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillClock" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgeClockState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1388,8 +1392,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xE753;" FontSize="13" Foreground="#F5C84C"/>
                                                     <TextBlock Text="Weather" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillWeather" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgeWeatherState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1409,8 +1413,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xEC4F;" FontSize="13" Foreground="#60CDFF"/>
                                                     <TextBlock Text="Media" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillMedia" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgeMediaState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1427,8 +1431,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xE950;" FontSize="13" Foreground="#60CDFF"/>
                                                     <TextBlock Text="System" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillPerf" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgePerfState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1448,8 +1452,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xE787;" FontSize="13" Foreground="#60CDFF"/>
                                                     <TextBlock Text="Calendar" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillCal" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgeCalState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1466,8 +1470,8 @@
                                                 <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                     <FontIcon Glyph="&#xE90B;" FontSize="13" Foreground="#60CDFF"/>
                                                     <TextBlock Text="Quotes" FontWeight="SemiBold" FontSize="12"/>
-                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
-                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    <Border x:Name="BadgePillQuote" Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock x:Name="TxtBadgeQuoteState" Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
                                                     </Border>
                                                 </StackPanel>
                                             </Button>
@@ -1504,13 +1508,38 @@
 
                                 <!-- RIGHT SIDE: Large Interactive Desktop Monitor Mockup -->
                                 <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="10" HorizontalAlignment="Center">
-                                    <!-- Compact Status Bar -->
-                                    <Grid Width="390" Margin="0,0,0,4">
-                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="6" Padding="8,4">
-                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                                    <FontIcon Glyph="&#xE7F4;" FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                                                    <TextBlock x:Name="TxtStatusPlacement" Text="Widgets Active" FontSize="12" FontWeight="SemiBold"/>
+                                    <!-- Multi-Monitor Mockup Switcher (Visible when 2+ displays detected) -->
+                                    <StackPanel x:Name="PanelMockupDisplaySelector" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" Margin="0,0,0,2" Visibility="Collapsed">
+                                        <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Screen:" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <ComboBox x:Name="ComboMockupDisplaySelector" SelectionChanged="OnMockupDisplaySelectionChanged" Width="190" Padding="8,4"/>
+                                    </StackPanel>
+
+                                    <!-- Compact Status & Widget Placement Selector -->
+                                    <Grid Width="390" Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <TextBlock Text="Target:" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            <ComboBox x:Name="ComboSelectedWidgetTarget" Width="112" SelectedIndex="0" Padding="8,4">
+                                                <ComboBoxItem Content="Clock" Tag="Clock"/>
+                                                <ComboBoxItem Content="Weather" Tag="Weather"/>
+                                                <ComboBoxItem Content="Media" Tag="Media"/>
+                                                <ComboBoxItem Content="Performance" Tag="Performance"/>
+                                                <ComboBoxItem Content="Calendar" Tag="Calendar"/>
+                                                <ComboBoxItem Content="Quotes" Tag="Quotes"/>
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="6" Padding="6,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE7F4;" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                                    <TextBlock x:Name="TxtStatusPlacement" Text="Click a zone" FontSize="11" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxWidth="90"/>
                                                     <TextBlock x:Name="TxtClockPositionName" Text="Top-Center" Visibility="Collapsed"/>
                                                 </StackPanel>
                                             </Border>
@@ -1526,8 +1555,6 @@
                                                 </StackPanel>
                                             </Button>
                                         </StackPanel>
-
-                                        <TextBlock Text="16:9 Display Preview" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                                     </Grid>
 
                                     <!-- Screen & Bezel -->
