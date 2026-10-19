@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="LivelyScreen_WinUI.Views.ScreensaverWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:LivelyScreen_WinUI.Controls"
+    Title="LivelyScreen"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootWindowGrid" Background="Black" Opacity="0"
+          FocusVisualPrimaryThickness="0"
+          FocusVisualSecondaryThickness="0"
+          IsTabStop="False">
+        <!-- Layer A -->
+        <Grid x:Name="LayerA" Opacity="1">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="TransformA" />
+            </Grid.RenderTransform>
+            <Image x:Name="ImageA" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <Image.RenderTransform>
+                    <CompositeTransform x:Name="ImageTransformA" />
+                </Image.RenderTransform>
+            </Image>
+            <MediaPlayerElement x:Name="VideoA" Stretch="UniformToFill" AutoPlay="True" AreTransportControlsEnabled="False" Visibility="Collapsed"/>
+        </Grid>
+
+        <!-- Layer B -->
+        <Grid x:Name="LayerB" Opacity="0">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="TransformB" />
+            </Grid.RenderTransform>
+            <Image x:Name="ImageB" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <Image.RenderTransform>
+                    <CompositeTransform x:Name="ImageTransformB" />
+                </Image.RenderTransform>
+            </Image>
+            <MediaPlayerElement x:Name="VideoB" Stretch="UniformToFill" AutoPlay="True" AreTransportControlsEnabled="False" Visibility="Collapsed"/>
+        </Grid>
+
+        <!-- Post-Processing Visual Filter Tint Layer -->
+        <Grid x:Name="VisualFilterLayer" IsHitTestVisible="False" Opacity="0" Visibility="Collapsed"/>
+
+        <!-- Display Brightness Dim Layer (Night / Glare Dimming) -->
+        <Grid x:Name="BrightnessDimLayer" Background="Black" Opacity="0" IsHitTestVisible="False" Visibility="Collapsed"/>
+
+        <!-- Media Info / EXIF Pill Overlay -->
+        <Border x:Name="BorderMediaInfo"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="48,0,0,40"
+                Background="#B8141720"
+                BorderBrush="#25FFFFFF"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="10,6,12,6"
+                Opacity="0"
+                Visibility="Collapsed"
+                IsHitTestVisible="False">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <FontIcon x:Name="IconMediaInfo" Glyph="&#xE722;" FontSize="12" Foreground="#85FFFFFF"/>
+                <TextBlock x:Name="TxtMediaInfo"
+                           Text=""
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="11.5"
+                           Foreground="#D0FFFFFF"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- OLED Protected Widgets Container with Dynamic Pixel-Shift Transform -->
+        <Grid x:Name="OledShiftContainer" IsHitTestVisible="False">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="OledShiftTransform" X="0" Y="0"/>
+            </Grid.RenderTransform>
+
+            <!-- Primary Lock-Screen Clock Overlay -->
+            <Grid x:Name="OverlayClockWidget" Visibility="Collapsed">
+                <controls:StylizedClockWidget x:Name="ClockWidgetControl" ClockScale="1.0"/>
+            </Grid>
+
+            <!-- Independent Literary Quotes & Sayings Overlay (Separate from Utility Card Dock) -->
+            <Grid x:Name="OverlayQuoteWidget" Visibility="Collapsed">
+                <controls:StylizedQuoteWidget x:Name="QuoteWidgetControl" QuoteScale="1.0"/>
+            </Grid>
+
+            <!-- Windows 11 Lock-Screen Card Widgets Layer (9 Auto-Stacking Horizontal Zone Docks) -->
+            <Grid x:Name="OverlayWidgetsLayer">
+                <StackPanel x:Name="ZoneStackTopLeft" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="56,48,0,0"/>
+                <StackPanel x:Name="ZoneStackTopCenter" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,48,0,0"/>
+                <StackPanel x:Name="ZoneStackTopRight" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,48,56,0"/>
+
+                <StackPanel x:Name="ZoneStackCenterLeft" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="56,0,0,0"/>
+                <StackPanel x:Name="ZoneStackCenter" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <StackPanel x:Name="ZoneStackCenterRight" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,56,0"/>
+
+                <StackPanel x:Name="ZoneStackBottomLeft" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="56,0,0,48"/>
+                <StackPanel x:Name="ZoneStackBottomCenter" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,48">
+                    <controls:StylizedWeatherWidget x:Name="WeatherWidgetControl" WeatherScale="1.0" Visibility="Collapsed"/>
+                    <controls:StylizedCalendarWidget x:Name="CalendarWidgetControl" CalendarScale="1.0" Visibility="Collapsed"/>
+                    <controls:StylizedMediaWidget x:Name="MediaWidgetControl" MediaScale="1.0" Visibility="Collapsed"/>
+                    <controls:StylizedPerformanceWidget x:Name="PerformanceWidgetControl" PerformanceScale="1.0" Visibility="Collapsed"/>
+                </StackPanel>
+                <StackPanel x:Name="ZoneStackBottomRight" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,56,48"/>
+            </Grid>
+        </Grid>
+
+        <!-- Second-Stage Auto-Blackout Scrim Overlay -->
+        <Grid x:Name="BlackoutScrim" Background="Black" Opacity="0" IsHitTestVisible="False" Visibility="Collapsed"/>
+
+        <!-- No Media Prompt -->
+        <Border x:Name="NoMediaPrompt" Visibility="Collapsed" Background="#D9111418" HorizontalAlignment="Center" VerticalAlignment="Center"
+                CornerRadius="12" Padding="28" BorderBrush="#33FFFFFF" BorderThickness="1">
+            <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <TextBlock Text="LivelyScreen" Foreground="White" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                <TextBlock Text="No photos or videos found in configured folders." Foreground="#A0A0A0" FontSize="14" HorizontalAlignment="Center"/>
+                <TextBlock Text="Move mouse or press any key to return to Windows." Foreground="#60CDFF" FontSize="12" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Invisible overlay capturing pointer and key events -->
+        <Canvas x:Name="EventCapturer" Background="Transparent"
+                FocusVisualPrimaryThickness="0"
+                FocusVisualSecondaryThickness="0"
+                IsTabStop="False"
+                PointerMoved="OnPointerMoved"
+                PointerPressed="OnPointerPressed"
+                KeyDown="OnKeyDown"/>
+    </Grid>
+</Window>

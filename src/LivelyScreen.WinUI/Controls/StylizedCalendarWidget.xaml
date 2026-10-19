@@ -1,0 +1,112 @@
+<UserControl
+    x:Class="LivelyScreen_WinUI.Controls.StylizedCalendarWidget"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootContainer" Width="244" Height="108" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Viewbox Stretch="Uniform">
+            <!-- Official Windows 11 Lock-Screen Card -->
+            <Border x:Name="PillBackdrop"
+                    Width="244"
+                    Height="108"
+                    CornerRadius="10"
+                    BorderThickness="1"
+                    BorderBrush="#22FFFFFF"
+                    Background="#B8141720"
+                    Padding="14,11,14,10">
+
+            <Grid RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Card Header (Day of Week + Date & ISO Week) -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xE787;" FontSize="11" Foreground="#A8FFFFFF" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtDayOfWeek"
+                                   Text="Sunday, Oct 18"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="11.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#B5FFFFFF"
+                                   TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtDayProgress"
+                               Grid.Column="1"
+                               Text="Week 42"
+                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                               FontSize="10.5"
+                               FontWeight="Medium"
+                               Foreground="#7AFFFFFF"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Row 1: Translucent Date Tile + Agenda Details -->
+                <Grid Grid.Row="1" VerticalAlignment="Center" ColumnSpacing="11">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Soft Translucent Date Tile (Not a solid neon block) -->
+                    <Border x:Name="BorderDateBadge"
+                            Grid.Column="0"
+                            Width="36"
+                            Height="36"
+                            CornerRadius="8"
+                            Background="#2460CDFF"
+                            BorderBrush="#1AFFFFFF"
+                            BorderThickness="1"
+                            VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtDayOfMonth"
+                                   Text="18"
+                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                   FontSize="17"
+                                   FontWeight="SemiBold"
+                                   Foreground="#60CDFF"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- Agenda Text -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtMonthYear"
+                                   Text="October 2026"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F8FFFFFF"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="TxtAgendaStatus"
+                                   Text="No upcoming calendar conflicts"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="11"
+                                   Foreground="#8AFFFFFF"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 2: Subtle Footer -->
+                <TextBlock x:Name="TxtCalendarFooter"
+                           Grid.Row="2"
+                           Text="All clear for the rest of today"
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="10.5"
+                           Foreground="#68FFFFFF"
+                           TextTrimming="CharacterEllipsis"/>
+            </Grid>
+            </Border>
+        </Viewbox>
+    </Grid>
+</UserControl>

@@ -1,0 +1,2016 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="LivelyScreen_WinUI.Views.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:labs="using:CommunityToolkit.WinUI.Controls"
+    xmlns:controls="using:LivelyScreen_WinUI.Controls"
+    d:DesignHeight="700"
+    d:DesignWidth="1000"
+    mc:Ignorable="d">
+
+    <Grid>
+        <!-- Native WinUI 3 NavigationView -->
+        <NavigationView
+            x:Name="NavView"
+            PaneDisplayMode="Auto"
+            CompactModeThresholdWidth="700"
+            ExpandedModeThresholdWidth="1050"
+            IsBackButtonVisible="Collapsed"
+            IsSettingsVisible="False"
+            PaneOpened="NavView_PaneOpened"
+            PaneClosed="NavView_PaneClosed"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.PaneHeader>
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,10,16,10" VerticalAlignment="Center">
+                    <Image Source="ms-appx:///Assets/LogoMark.png" Width="24" Height="24" VerticalAlignment="Center" />
+                    <TextBlock Text="LivelyScreen" Style="{StaticResource SubtitleTextBlockStyle}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" />
+                </StackPanel>
+            </NavigationView.PaneHeader>
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="General &amp; Idle" Tag="general">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE823;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Monitors &amp; Layout" Tag="displays">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7F4;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Media Folders" Tag="media">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B7;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Widgets &amp; Overlays" Tag="widgets">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE81C;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Power &amp; Dismissal" Tag="power">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE7E8;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <NavigationView.PaneFooter>
+                <StackPanel x:Name="PanelPaneFooter" Margin="12,8" Spacing="6" HorizontalAlignment="Stretch">
+                    <Button x:Name="BtnPreviewNow"
+                            Click="OnPreviewNowClicked"
+                            Style="{StaticResource AccentButtonStyle}"
+                            HorizontalAlignment="Stretch"
+                            ToolTipService.ToolTip="Start Screensaver (Win + Ctrl + S)">
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                            <FontIcon Glyph="&#xE768;" FontSize="13"/>
+                            <TextBlock x:Name="TxtPreviewBtnText" Text="Start Screensaver"/>
+                        </StackPanel>
+                    </Button>
+                    <TextBlock x:Name="TxtHotkeyHint" Text="Hotkey: Win + Ctrl + S" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </NavigationView.PaneFooter>
+
+            <!-- Content Area with SettingsCards -->
+            <ScrollViewer Padding="20,16,20,24" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled">
+                <StackPanel Spacing="24">
+                    
+                    <!-- TAB 1: GENERAL -->
+                    <StackPanel x:Name="PanelGeneral" Spacing="8">
+                        <TextBlock Text="General &amp; Idle Detection" Style="{StaticResource TitleTextBlockStyle}"/>
+                        <TextBlock Text="Control when the screensaver activates and background system integration." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Idle Activation Delay" Description="Minutes without user input before screensaver starts." Margin="0,12,0,0">
+                            <StackPanel Orientation="Vertical" Spacing="8" HorizontalAlignment="Right">
+                                <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Right">
+                                    <Slider x:Name="SliderIdleMinutes" Minimum="1" Maximum="60" Width="180" ValueChanged="OnSettingChanged"/>
+                                    <TextBlock x:Name="TxtIdleMinutes" Width="55" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                    <Button Content="1m" Click="OnIdlePresetClicked" Tag="1" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                    <Button Content="2m" Click="OnIdlePresetClicked" Tag="2" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                    <Button Content="5m" Click="OnIdlePresetClicked" Tag="5" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                    <Button Content="10m" Click="OnIdlePresetClicked" Tag="10" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                    <Button Content="15m" Click="OnIdlePresetClicked" Tag="15" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                    <Button Content="30m" Click="OnIdlePresetClicked" Tag="30" Padding="8,2" FontSize="11" CornerRadius="4"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Start with Windows" Description="Launch LivelyScreen in background when signing into Windows.">
+                            <ToggleSwitch x:Name="ToggleAutoStart" Toggled="OnAutoStartToggled"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Smart Pause in Games &amp; Fullscreen Apps" Description="Suppresses screensaver when DirectX games or media players are running.">
+                            <ToggleSwitch x:Name="ToggleSmartPause" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="App &amp; Tray Theme" Description="Match Windows system theme or force Dark / Light appearance.">
+                            <ComboBox x:Name="ComboAppTheme" SelectionChanged="OnSettingChanged" Width="200">
+                                <ComboBoxItem Content="System (Match Windows)"/>
+                                <ComboBoxItem Content="Dark Mode"/>
+                                <ComboBoxItem Content="Light Mode"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Instant Activation Hotkey" Description="Global hotkey to start screensaver instantly anytime.">
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="10,4">
+                                <TextBlock Text="Win + Ctrl + S" FontFamily="Consolas" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </Border>
+                        </labs:SettingsCard>
+                    </StackPanel>
+
+                    <!-- TAB 2: DISPLAYS -->
+                    <StackPanel x:Name="PanelDisplays" Visibility="Collapsed" Spacing="8">
+                        <TextBlock Text="Monitors &amp; Display Layout" Style="{StaticResource TitleTextBlockStyle}"/>
+                        <TextBlock Text="Configure multi-monitor playback behavior." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Connected Displays Detected" Description="Physical monitors recognized by Windows App SDK." Margin="0,12,0,0">
+                            <TextBlock x:Name="TxtDetectedDisplays" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Target Monitor" Description="Select which monitor plays media. Inactive screens are blanked to protect display.">
+                            <ComboBox x:Name="ComboTargetDisplay" SelectionChanged="OnTargetDisplayChanged" Width="280"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard x:Name="CardDisplayMode" Header="Multi-Monitor Display Mode" Description="Choose how media is distributed across multiple screens (Only active when All Displays is selected).">
+                            <ComboBox x:Name="ComboDisplayMode" SelectionChanged="OnSettingChanged" Width="240">
+                                <ComboBoxItem Content="Independent (Separate items)"/>
+                                <ComboBoxItem Content="Clone Mirror (Synchronized)"/>
+                                <ComboBoxItem Content="Span Canvas (Ultra-wide)"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <!-- PER-MONITOR SOURCE ASSIGNMENT -->
+                        <StackPanel x:Name="PanelPerMonitorRouting" Spacing="8" Margin="0,8,0,0">
+                            <TextBlock Text="Per-Monitor Media Sources" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,4,0,2"/>
+                            <TextBlock Text="Assign distinct folders or dynamic themes to individual monitors (when Independent mode is active)." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <StackPanel x:Name="StackPerMonitorCards" Spacing="6"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- TAB 3: MEDIA FOLDERS -->
+                    <StackPanel x:Name="PanelMedia" Visibility="Collapsed" Spacing="8">
+                        <TextBlock Text="Media Folders &amp; Dynamic Themes" Style="{StaticResource TitleTextBlockStyle}"/>
+                        <TextBlock Text="Supported: Dynamic Themes (.lsdt, .zip, theme.json), MP4, MKV, WebM, MOV, JPG, PNG, WEBP, BMP, GIF." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- TOP ACTIVE SOURCE BANNER -->
+                        <Border CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Padding="14,10" Margin="0,4,0,0">
+                            <Grid ColumnSpacing="16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left: Source Info -->
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="Active Screensaver Source" FontWeight="SemiBold" FontSize="14"/>
+                                    <TextBlock x:Name="TxtActiveSourceTitle" Text="All Sources (Combined)" FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+
+                                <!-- Right: Actions Group -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Button Content="+ Add Folder" Click="OnAddFolderClicked" Style="{StaticResource AccentButtonStyle}" ToolTipService.ToolTip="Add standard media folder with photos and videos"/>
+                                    <Button Content="Import Theme" Click="OnImportThemeClicked" ToolTipService.ToolTip="Import dynamic wallpaper theme (.lsdt, .zip, theme.json)"/>
+
+                                    <Border Width="1" Height="18" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="2,0"/>
+
+                                    <Button x:Name="BtnPlayAllCombined" Content="Play All" Click="OnPlayAllCombinedClicked" ToolTipService.ToolTip="Cycle all sources combined"/>
+
+                                    <Button Tag="ALL" Click="OnSourceEffectsClicked" ToolTipService.ToolTip="Configure transitions &amp; effects for All Sources combined">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon Glyph="&#xE790;" FontSize="12"/>
+                                            <TextBlock Text="Effects" FontSize="12"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <Button Click="OnRescanClicked" ToolTipService.ToolTip="Rescan all folders for media changes" Padding="8,6">
+                                        <FontIcon Glyph="&#xE72C;" FontSize="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- CATEGORY 1: DYNAMIC WALLPAPER THEMES -->
+                        <Expander x:Name="ExpanderDynamicThemes" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Expander.Header>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="Dynamic Wallpaper Themes" FontWeight="SemiBold" FontSize="15"/>
+                                        <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                            <TextBlock x:Name="TxtThemeBadge" Text="0 Themes" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Solar-matched dynamic themes (.lsdt, theme.json) with real-time day/night progression." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <ListView x:Name="ListDynamicThemes" SelectionMode="None" MaxHeight="280" IsItemClickEnabled="False">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Padding" Value="0,2"/>
+                                            <Setter Property="MinHeight" Value="0"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,2"
+                                                    Padding="12,10"
+                                                    CornerRadius="8"
+                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    HorizontalAlignment="Stretch">
+                                                <Grid RowSpacing="8">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <Grid Grid.Row="0" ColumnSpacing="10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="6"
+                                                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                                BorderThickness="1"
+                                                                VerticalAlignment="Center">
+                                                            <FontIcon Glyph="{Binding Glyph}" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="4,0">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding BadgeText}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ItemCountText}" FontSize="12" FontWeight="Medium" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                                                <TextBlock Text="•" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                                                <TextBlock Text="{Binding PathText}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+
+                                                        <Button Grid.Column="2"
+                                                                Content="Export .lsdt"
+                                                                Tag="{Binding Path}"
+                                                                Click="OnExportThemeClicked"
+                                                                VerticalAlignment="Center"/>
+                                                    </Grid>
+
+                                                    <Grid Grid.Row="1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Button Grid.Column="0"
+                                                                Tag="{Binding Path}"
+                                                                Click="OnSourceEffectsClicked"
+                                                                ToolTipService.ToolTip="Configure transitions &amp; effects for this theme">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <FontIcon Glyph="&#xE790;" FontSize="12"/>
+                                                                <TextBlock Text="Transitions &amp; Effects" FontSize="12"/>
+                                                            </StackPanel>
+                                                        </Button>
+
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                                            <Button Content="{Binding ActionButtonText}"
+                                                                    Tag="{Binding Path}"
+                                                                    Click="OnSetSourceActiveClicked"
+                                                                    IsEnabled="{Binding CanSetActive}"/>
+
+                                                            <Button Content="Remove"
+                                                                    Tag="{Binding Path}"
+                                                                    Click="OnRemoveSourceClicked"
+                                                                    Visibility="{Binding RemoveVisibility}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <StackPanel x:Name="PanelSolarConfig" Spacing="8">
+                                    <labs:SettingsCard x:Name="CardThemeMode" Header="Solar Playback Mode" Description="Match real-time clock or cycle current segment.">
+                                        <ComboBox x:Name="ComboThemeMode" SelectionChanged="OnSettingChanged" Width="260">
+                                            <ComboBoxItem Content="Exact Solar Time (Default)"/>
+                                            <ComboBoxItem Content="Cycle Current Solar Segment"/>
+                                            <ComboBoxItem Content="Full 24h Time-Lapse"/>
+                                        </ComboBox>
+                                    </labs:SettingsCard>
+
+                                    <Border x:Name="CardSolarSchedule"
+                                            CornerRadius="8"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            Padding="16,12"
+                                            HorizontalAlignment="Stretch">
+                                        <Grid RowSpacing="10">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <StackPanel Grid.Row="0" Spacing="2">
+                                                <TextBlock Text="Sunrise &amp; Sunset Schedule" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Auto solar calculation or custom times." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <ToggleSwitch x:Name="ToggleCustomSolar" OnContent="Custom" OffContent="Auto" Toggled="OnSettingChanged" HorizontalAlignment="Left"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <TextBlock Text="SR:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    <TimePicker x:Name="TimePickerSunrise" ClockIdentifier="24HourClock" SelectedTimeChanged="OnSolarTimePickerChanged"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <TextBlock Text="SS:" VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    <TimePicker x:Name="TimePickerSunset" ClockIdentifier="24HourClock" SelectedTimeChanged="OnSolarTimePickerChanged"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+
+                                    <labs:SettingsCard x:Name="CardSegmentOverride" Header="Solar Segment Preview / Override" Description="Follow real-time clock or force a specific time of day.">
+                                        <ComboBox x:Name="ComboSegmentOverride" SelectionChanged="OnSettingChanged" Width="220">
+                                            <ComboBoxItem Content="Real-Time Clock (Auto)"/>
+                                            <ComboBoxItem Content="Force Sunrise"/>
+                                            <ComboBoxItem Content="Force Day"/>
+                                            <ComboBoxItem Content="Force Sunset"/>
+                                            <ComboBoxItem Content="Force Night"/>
+                                        </ComboBox>
+                                    </labs:SettingsCard>
+
+                                    <!-- MODERN SOLAR DASHBOARD & ACTIVE WALLPAPER PREVIEW -->
+                                    <Border x:Name="CardThemeStatus"
+                                            CornerRadius="8"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            Padding="14,12"
+                                            HorizontalAlignment="Stretch">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- 16:9 Thumbnail Preview -->
+                                            <Border Grid.Column="0"
+                                                    Width="160" Height="90"
+                                                    CornerRadius="6"
+                                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1">
+                                                <Grid>
+                                                    <Image x:Name="ImgWallpaperPreview"
+                                                           Stretch="UniformToFill"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                                    <FontIcon x:Name="IconPreviewFallback"
+                                                              Glyph="&#xEB9F;"
+                                                              FontSize="30"
+                                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                              HorizontalAlignment="Center"
+                                                              VerticalAlignment="Center"
+                                                              Visibility="Collapsed"/>
+                                                </Grid>
+                                            </Border>
+
+                                            <!-- Structured Details on the Right -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                                                <!-- Header Line: Title + Phase Badge + Frame Number -->
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="TxtPreviewTitle"
+                                                               Text="Dynamic Theme Status"
+                                                               FontWeight="SemiBold"
+                                                               FontSize="15"
+                                                               VerticalAlignment="Center"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    
+                                                    <Border x:Name="BadgeActivePhase"
+                                                            Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock x:Name="TxtActivePhase"
+                                                                   Text="Day"
+                                                                   FontSize="11"
+                                                                   Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+
+                                                    <Border x:Name="BadgeFrameNum"
+                                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                            CornerRadius="4"
+                                                            Padding="6,2"
+                                                            VerticalAlignment="Center">
+                                                        <TextBlock x:Name="TxtFrameNum"
+                                                                   Text="Frame #3 of 8"
+                                                                   FontSize="11"
+                                                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                                   FontWeight="SemiBold"/>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- Middle Line: File Name & Time Window -->
+                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="TxtActiveFileName"
+                                                               Text="Wp_3.png"
+                                                               FontSize="12"
+                                                               FontWeight="Medium"
+                                                               Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                                    <TextBlock Text="•" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                                    <TextBlock x:Name="TxtActiveTimeWindow"
+                                                               Text="Active solar window"
+                                                               FontSize="12"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                </StackPanel>
+
+                                                <!-- Bottom Row: 4 Mini Solar Phase Chips -->
+                                                <StackPanel x:Name="PanelSolarChips" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <Border x:Name="ChipSunrise" CornerRadius="4" Padding="8,3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <TextBlock x:Name="TxtChipSunrise" Text="Sunrise" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Border x:Name="ChipDay" CornerRadius="4" Padding="8,3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <TextBlock x:Name="TxtChipDay" Text="Day" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Border x:Name="ChipSunset" CornerRadius="4" Padding="8,3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <TextBlock x:Name="TxtChipSunset" Text="Sunset" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    </Border>
+                                                    <Border x:Name="ChipNight" CornerRadius="4" Padding="8,3" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                                        <TextBlock x:Name="TxtChipNight" Text="Night" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                    </Border>
+                                                </StackPanel>
+
+                                                <!-- Standard Folder Details (visible when non-solar) -->
+                                                <TextBlock x:Name="TxtStandardDetails"
+                                                           Text=""
+                                                           FontSize="12"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           Visibility="Collapsed"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- CATEGORY 2: STANDARD MEDIA FOLDERS -->
+                        <Expander x:Name="ExpanderStandardFolders" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Expander.Header>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="Standard Media Folders (Photos &amp; Videos)" FontWeight="SemiBold" FontSize="15"/>
+                                        <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                            <TextBlock x:Name="TxtStandardFolderBadge" Text="0 Folders" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Folders with photos and videos (MP4, MKV, WebM, MOV, JPG, PNG, WEBP, GIF)." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <ListView x:Name="ListStandardFolders" SelectionMode="None" MaxHeight="280" IsItemClickEnabled="False">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Padding" Value="0,2"/>
+                                            <Setter Property="MinHeight" Value="0"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,2"
+                                                    Padding="12,10"
+                                                    CornerRadius="8"
+                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    HorizontalAlignment="Stretch">
+                                                <Grid RowSpacing="8">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <Grid Grid.Row="0" ColumnSpacing="10">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="6"
+                                                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                                BorderThickness="1"
+                                                                VerticalAlignment="Center">
+                                                            <FontIcon Glyph="{Binding Glyph}" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+
+                                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="4,0">
+                                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding BadgeText}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding ItemCountText}" FontSize="12" FontWeight="Medium" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                                                                <TextBlock Text="•" FontSize="12" Foreground="{ThemeResource TextFillColorTertiaryBrush}"/>
+                                                                <TextBlock Text="{Binding PathText}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </Grid>
+
+                                                    <Grid Grid.Row="1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <Button Grid.Column="0"
+                                                                Tag="{Binding Path}"
+                                                                Click="OnSourceEffectsClicked"
+                                                                ToolTipService.ToolTip="Configure transitions &amp; effects for this folder">
+                                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                <FontIcon Glyph="&#xE790;" FontSize="12"/>
+                                                                <TextBlock Text="Transitions &amp; Effects" FontSize="12"/>
+                                                            </StackPanel>
+                                                        </Button>
+
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                                            <Button Content="{Binding ActionButtonText}"
+                                                                    Tag="{Binding Path}"
+                                                                    Click="OnSetSourceActiveClicked"
+                                                                    IsEnabled="{Binding CanSetActive}"/>
+
+                                                            <Button Content="Remove"
+                                                                    Tag="{Binding Path}"
+                                                                    Click="OnRemoveSourceClicked"
+                                                                    Visibility="{Binding RemoveVisibility}"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <labs:SettingsCard x:Name="CardStandardOrder" Header="Standard Folder Playback Order" Description="Progression order when playing photos and videos from standard folders.">
+                                    <ComboBox x:Name="ComboPlaybackOrder" SelectionChanged="OnSettingChanged" Width="260">
+                                        <ComboBoxItem Content="Dynamic Sequential (image1, image2...)"/>
+                                        <ComboBoxItem Content="Random Shuffle"/>
+                                        <ComboBoxItem Content="Alphabetical (A - Z)"/>
+                                        <ComboBoxItem Content="Date Modified (Newest first)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+                            </StackPanel>
+                        </Expander>
+
+                        <labs:SettingsCard Header="Video Audio &amp; Volume" Description="Muted by default to prevent unexpected noise.">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <ToggleSwitch x:Name="ToggleAudio" OnContent="Audio On" OffContent="Muted" Toggled="OnSettingChanged"/>
+                                <Slider x:Name="SliderVolume" Minimum="0" Maximum="100" Width="120" ValueChanged="OnSettingChanged"/>
+                                <TextBlock x:Name="TxtVolume" Width="45" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <!-- Post-Processing & Visual Mood -->
+                        <TextBlock Text="Visual Filters &amp; Display Dimming" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
+                        <TextBlock Text="Enhance screensaver ambiance with cinematic color grading and night glare reduction." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Visual Color Filter Preset" Description="Apply artistic cinematic tint or film color grading to photos and videos.">
+                            <ComboBox x:Name="ComboVisualFilter" SelectionChanged="OnSettingChanged" Width="220">
+                                <ComboBoxItem Content="None (Original Colors)"/>
+                                <ComboBoxItem Content="Warm Sepia"/>
+                                <ComboBoxItem Content="Cinematic Cool (Teal/Blue)"/>
+                                <ComboBoxItem Content="High-Contrast Noir"/>
+                                <ComboBoxItem Content="Vintage Film"/>
+                                <ComboBoxItem Content="Cyberpunk Neon"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Night Brightness Dimming" Description="Dim screensaver brightness to reduce eye strain and glare in dark rooms.">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <Slider x:Name="SliderBrightnessDim" Minimum="0" Maximum="80" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                <TextBlock x:Name="TxtBrightnessDim" Width="45" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Show Photo EXIF / Media Info Pill" Description="Display translucent camera metadata pill (camera model, ƒ-stop, shutter, ISO, date) in the bottom corner.">
+                            <ToggleSwitch x:Name="ToggleMediaInfoPill" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <!-- Ambient Soundscapes & Music -->
+                        <TextBlock Text="Ambient Background Music &amp; Soundscapes" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
+                        <TextBlock Text="Play your custom Lo-Fi music library (.flac, .mp3) or relaxing soundscapes while the screensaver runs." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Background Audio Mode" Description="Play custom music playlist or procedural soundscapes.">
+                            <ComboBox x:Name="ComboAmbientSound" SelectionChanged="OnSettingChanged" Width="260">
+                                <ComboBoxItem Content="None (Silent)"/>
+                                <ComboBoxItem Content="Custom Music Folder (.flac, .mp3, playlist)"/>
+                                <ComboBoxItem Content="Soothing Rain"/>
+                                <ComboBoxItem Content="Warm Hearth"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Music &amp; Sound Volume" Description="Adjust playback volume while screensaver is active.">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <Slider x:Name="SliderAmbientVolume" Minimum="0" Maximum="100" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                <TextBlock x:Name="TxtAmbientVolume" Width="45" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Shuffle Music Playlist" Description="Randomize track order when playing from a music folder.">
+                            <ToggleSwitch x:Name="ToggleAmbientShuffle" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Custom Music Folder or Audio File" Description="Supports .flac, .mp3, .wav, .m4a, .aac, .ogg tracks and nested folders.">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TxtAmbientCustomPath" PlaceholderText="Select music folder or audio file..." TextChanged="OnSettingChanged" Width="240"/>
+                                <Button Grid.Column="1" Content="Browse Folder" Click="OnBrowseAmbientFolderClicked"/>
+                                <Button Grid.Column="2" Content="Browse File" Click="OnBrowseAmbientAudioClicked"/>
+                            </Grid>
+                        </labs:SettingsCard>
+                    </StackPanel>
+
+                    <!-- TAB 4: POWER & SENSITIVITY -->
+                    <StackPanel x:Name="PanelPower" Visibility="Collapsed" Spacing="8">
+                        <TextBlock Text="Power &amp; Dismissal" Style="{StaticResource TitleTextBlockStyle}"/>
+                        <TextBlock Text="Resource management and vibration rejection." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Mouse Movement Sensitivity Threshold" Description="Pixel distance required to dismiss screensaver (prevents micro-vibrations)." Margin="0,12,0,0">
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <Slider x:Name="SliderSensitivity" Minimum="5" Maximum="100" Width="160" ValueChanged="OnSettingChanged"/>
+                                <TextBlock x:Name="TxtSensitivity" Width="55" VerticalAlignment="Center" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Allow Windows Display Sleep" Description="Let monitors power down after configured Windows sleep timeout.">
+                            <ToggleSwitch x:Name="ToggleDisplaySleep" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="OLED Pixel-Shift Protection" Description="Subtly shifts widgets by a few pixels over time to prevent static image burn-in on OLED displays.">
+                            <ToggleSwitch x:Name="ToggleOledShift" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Second-Stage Auto-Blackout &amp; Sleep" Description="Fade screen to pitch black and permit hardware display sleep after prolonged idle.">
+                            <ComboBox x:Name="ComboAutoBlackout" SelectionChanged="OnSettingChanged" Width="180">
+                                <ComboBoxItem Content="Disabled (Never)"/>
+                                <ComboBoxItem Content="After 5 minutes"/>
+                                <ComboBoxItem Content="After 10 minutes"/>
+                                <ComboBoxItem Content="After 15 minutes"/>
+                                <ComboBoxItem Content="After 30 minutes"/>
+                                <ComboBoxItem Content="After 60 minutes"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <!-- HOT CORNERS -->
+                        <TextBlock Text="Hot Corners" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
+                        <TextBlock Text="Trigger or inhibit the screensaver by resting the mouse cursor in screen corners." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Trigger Corner" Description="Rest cursor in this corner for 2 seconds to launch screensaver instantly.">
+                            <ComboBox x:Name="ComboTriggerCorner" SelectionChanged="OnSettingChanged" Width="180">
+                                <ComboBoxItem Content="Disabled (None)"/>
+                                <ComboBoxItem Content="Top-Left"/>
+                                <ComboBoxItem Content="Top-Right"/>
+                                <ComboBoxItem Content="Bottom-Left"/>
+                                <ComboBoxItem Content="Bottom-Right"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Lockout Corner" Description="Keep cursor in this corner to prevent screensaver from starting.">
+                            <ComboBox x:Name="ComboDisableCorner" SelectionChanged="OnSettingChanged" Width="180">
+                                <ComboBoxItem Content="Disabled (None)"/>
+                                <ComboBoxItem Content="Top-Left"/>
+                                <ComboBoxItem Content="Top-Right"/>
+                                <ComboBoxItem Content="Bottom-Left"/>
+                                <ComboBoxItem Content="Bottom-Right"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <!-- BATTERY & PROCESS GUARDS -->
+                        <TextBlock Text="Smart Activity &amp; Power Guards" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
+                        <TextBlock Text="Avoid GPU battery drain and prevent interruptions during work or presentations." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <labs:SettingsCard Header="Pause on Battery Power" Description="Suppress automatic screensaver activation when running on laptop battery.">
+                            <ToggleSwitch x:Name="TogglePauseOnBattery" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Blocked Processes / Apps" Description="Suppress screensaver when any listed process is running (comma-separated, e.g. obs64, blender, zoom).">
+                            <TextBox x:Name="TxtBlockedProcesses" Width="300" PlaceholderText="e.g. obs64, blender, zoom" TextChanged="OnBlockedProcessesTextChanged"/>
+                        </labs:SettingsCard>
+                    </StackPanel>
+
+                    <!-- TAB 6: WIDGETS & OVERLAYS -->
+                    <StackPanel x:Name="PanelWidgets" Visibility="Collapsed" Spacing="8">
+                        <TextBlock Text="Screensaver Widgets &amp; Overlays" Style="{StaticResource TitleTextBlockStyle}"/>
+                        <TextBlock Text="Display live time, date, and glanceable info on top of screensaver media." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Master Toggle -->
+                        <labs:SettingsCard Header="Enable Screensaver Widgets" Description="Show overlay widgets while the screensaver is running." Margin="0,12,0,0">
+                            <ToggleSwitch x:Name="ToggleWidgetsEnabled" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Show Widgets on All Monitors" Description="Display clock and widgets across every connected display instead of only primary monitor.">
+                            <ToggleSwitch x:Name="ToggleWidgetsAllMonitors" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <!-- ACTIVE WIDGET MODULES -->
+                        <TextBlock Text="Widget Modules" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
+                        <TextBlock Text="Enable and configure individual glanceable widgets for your screensaver." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Clock Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderClockWidget"
+                                               Header="Time &amp; Date Clock"
+                                               Description="Show Windows 11 lock screen digital clock and date on the screensaver."
+                                               IsExpanded="False">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE823;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="ToggleClockWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- Clock Font Family -->
+                                <labs:SettingsCard Header="Clock Typography" Description="Choose between Windows 11 Lock Screen font, bundled SF Pro, Nunito, or Bahnschrift.">
+                                    <ComboBox x:Name="ComboClockFont" SelectionChanged="OnSettingChanged" Width="220">
+                                        <ComboBoxItem Content="Segoe UI Variable Display"/>
+                                        <ComboBoxItem Content="SF Pro Display"/>
+                                        <ComboBoxItem Content="Nunito"/>
+                                        <ComboBoxItem Content="Bahnschrift"/>
+                                        <ComboBoxItem Content="Segoe UI"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Clock Color Tint -->
+                                <labs:SettingsCard Header="Color Tint Preset" Description="Subtle color tint for the clock and date with readability contrast shadow.">
+                                    <ComboBox x:Name="ComboClockColor" SelectionChanged="OnSettingChanged" Width="200">
+                                        <ComboBoxItem Content="Crisp White"/>
+                                        <ComboBoxItem Content="Ice Blue"/>
+                                        <ComboBoxItem Content="Soft Amber"/>
+                                        <ComboBoxItem Content="Mint"/>
+                                        <ComboBoxItem Content="Lavender"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Clock Format Options -->
+                                <labs:SettingsCard Header="Time Format" Description="Select between 12-hour (no leading zero) and 24-hour time.">
+                                    <ComboBox x:Name="ComboClockFormat" SelectionChanged="OnSettingChanged" Width="200">
+                                        <ComboBoxItem Content="12-Hour (e.g. 9:41)"/>
+                                        <ComboBoxItem Content="24-Hour (e.g. 09:41)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Show AM/PM Toggle -->
+                                <labs:SettingsCard Header="Show AM / PM Indicator" Description="Display AM/PM indicator next to 12-hour time.">
+                                    <ToggleSwitch x:Name="ToggleClockAmPm" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Seconds Toggle -->
+                                <labs:SettingsCard Header="Show Seconds" Description="Include seconds counter with smooth micro-fade tick.">
+                                    <ToggleSwitch x:Name="ToggleClockSeconds" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Date Toggle -->
+                                <labs:SettingsCard Header="Show Calendar Date" Description="Display calendar date alongside the clock.">
+                                    <ToggleSwitch x:Name="ToggleClockDate" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Date Format -->
+                                <labs:SettingsCard Header="Date Format Style" Description="Select how the date text is formatted.">
+                                    <ComboBox x:Name="ComboDateFormat" SelectionChanged="OnSettingChanged" Width="240">
+                                        <ComboBoxItem Content="Full (e.g. Thursday, March 21)"/>
+                                        <ComboBoxItem Content="Short (e.g. Thu, Mar 21)"/>
+                                        <ComboBoxItem Content="Numeric (e.g. 3/21/2026)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Date Placement (Above vs Below) -->
+                                <labs:SettingsCard Header="Date Header Placement" Description="Position the calendar date above or below the lock screen time.">
+                                    <ComboBox x:Name="ComboDatePosition" SelectionChanged="OnSettingChanged" Width="240">
+                                        <ComboBoxItem Content="Below Time (Windows 11 Default)"/>
+                                        <ComboBoxItem Content="Above Time"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Frosted Glass Pill Backdrop Toggle -->
+                                <labs:SettingsCard Header="Frosted Glass Pill Backdrop" Description="Show a modern translucent acrylic pill container behind the time and date.">
+                                    <ToggleSwitch x:Name="ToggleGlassPill" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Frosted Glass Opacity Slider -->
+                                <labs:SettingsCard x:Name="CardGlassOpacity" Header="Backdrop Opacity" Description="Adjust the density and translucency of the frosted glass pill.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderGlassOpacity" Minimum="10" Maximum="90" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtGlassOpacity" Text="40%" VerticalAlignment="Center" Width="40" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Clock Size Scale Slider -->
+                                <labs:SettingsCard Header="Clock Size Scale" Description="Adjust the overall size of the lock screen clock and typography.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderClockScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtClockScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- Weather Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderWeatherWidget"
+                                               Header="Weather Forecast"
+                                               Description="Show live local temperature, condition icon, city, and daily high/low."
+                                               IsExpanded="False">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE753;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="ToggleWeatherWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- City / Location -->
+                                <labs:SettingsCard Header="Location / City" Description="Specify city name (e.g. San Francisco, Tokyo, London) or 'Auto' for local detection.">
+                                    <TextBox x:Name="TxtWeatherCity" Width="220" TextChanged="OnSettingChanged" PlaceholderText="Auto"/>
+                                </labs:SettingsCard>
+
+                                <!-- Temperature Unit -->
+                                <labs:SettingsCard Header="Temperature Unit" Description="Choose Celsius (°C) or Fahrenheit (°F).">
+                                    <ComboBox x:Name="ComboWeatherUnit" SelectionChanged="OnSettingChanged" Width="200">
+                                        <ComboBoxItem Content="Celsius (°C)"/>
+                                        <ComboBoxItem Content="Fahrenheit (°F)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Weather Size Scale -->
+                                <labs:SettingsCard Header="Weather Size Scale" Description="Adjust the display size of the weather widget.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderWeatherScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtWeatherScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- Media / Now Playing Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderMediaWidget"
+                                               Header="Media / Now Playing"
+                                               Description="Show currently playing track, artist, album thumbnail, and status from Spotify, YouTube, or Apple Music."
+                                               IsExpanded="False">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE768;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="ToggleMediaWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- Media Size Scale -->
+                                <labs:SettingsCard Header="Media Size Scale" Description="Adjust the display size of the now playing widget.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderMediaScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtMediaScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Show Album Art Thumbnail -->
+                                <labs:SettingsCard Header="Show Album Art Thumbnail" Description="Display album cover art when provided by active media session.">
+                                    <ToggleSwitch x:Name="ToggleMediaAlbumArt" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Hide When Idle -->
+                                <labs:SettingsCard Header="Hide Widget When Idle" Description="Automatically fade out media widget when no music or video is playing.">
+                                    <ToggleSwitch x:Name="ToggleMediaHideWhenIdle" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Idle Placeholder Text -->
+                                <labs:SettingsCard Header="Idle Placeholder Title" Description="Custom text displayed when waiting for media playback.">
+                                    <TextBox x:Name="TxtMediaIdleText" Width="200" TextChanged="OnSettingChanged" PlaceholderText="Ready for Music"/>
+                                </labs:SettingsCard>
+
+                                <!-- Audio Spectrum Equalizer -->
+                                <labs:SettingsCard Header="Audio Spectrum Equalizer" Description="Animate live responsive frequency equalizer bars inside the widget while audio is playing.">
+                                    <ToggleSwitch x:Name="ToggleAudioSpectrum" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- Performance Monitor Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderPerformanceWidget"
+                                               Header="System Performance Monitor"
+                                               Description="Show real-time CPU and RAM utilization meters directly on your screensaver."
+                                               IsExpanded="False">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE950;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="TogglePerformanceWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- Performance Scale -->
+                                <labs:SettingsCard Header="Monitor Size Scale" Description="Adjust the display size of the performance meters.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderPerformanceScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtPerformanceScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Show CPU Meter -->
+                                <labs:SettingsCard Header="Show CPU Meter" Description="Display real-time processor load meter and bar.">
+                                    <ToggleSwitch x:Name="TogglePerfShowCpu" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show RAM Meter -->
+                                <labs:SettingsCard Header="Show Memory (RAM) Meter" Description="Display real-time memory usage meter and bar.">
+                                    <ToggleSwitch x:Name="TogglePerfShowRam" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Numeric Percentages -->
+                                <labs:SettingsCard Header="Show Percentage Numbers" Description="Display numeric percent text alongside the meters.">
+                                    <ToggleSwitch x:Name="TogglePerfPercentages" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- High Load Warning Threshold -->
+                                <labs:SettingsCard Header="High Load Alert Threshold" Description="Highlight meters with warm alert color when load reaches threshold.">
+                                    <ComboBox x:Name="ComboPerfThreshold" SelectionChanged="OnSettingChanged" Width="200">
+                                        <ComboBoxItem Content="80% Load"/>
+                                        <ComboBoxItem Content="85% Load"/>
+                                        <ComboBoxItem Content="90% Load"/>
+                                        <ComboBoxItem Content="95% Load"/>
+                                        <ComboBoxItem Content="Disabled"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Refresh Interval -->
+                                <labs:SettingsCard Header="Metrics Refresh Speed" Description="Balance update responsiveness with background system efficiency.">
+                                    <ComboBox x:Name="ComboPerfFrequency" SelectionChanged="OnSettingChanged" Width="200">
+                                        <ComboBoxItem Content="Responsive (1 second)"/>
+                                        <ComboBoxItem Content="Balanced (2 seconds)"/>
+                                        <ComboBoxItem Content="Power Saver (5 seconds)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- Calendar / Agenda Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderCalendarWidget"
+                                               Header="Calendar &amp; Agenda"
+                                               Description="Show current date block, week number, and daily calendar status."
+                                               IsExpanded="False">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE787;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="ToggleCalendarWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- Calendar Scale -->
+                                <labs:SettingsCard Header="Calendar Size Scale" Description="Adjust the display size of the calendar widget.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderCalendarScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtCalendarScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Date Format Header Style -->
+                                <labs:SettingsCard Header="Date Header Format" Description="Format of the day and date at the top of the card.">
+                                    <ComboBox x:Name="ComboCalendarFormat" SelectionChanged="OnSettingChanged" Width="220">
+                                        <ComboBoxItem Content="Full (Sunday, Oct 18)"/>
+                                        <ComboBoxItem Content="Short (Sun, Oct 18)"/>
+                                        <ComboBoxItem Content="Day Only (Sunday)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Show Week Number -->
+                                <labs:SettingsCard Header="Show Week Number" Description="Display ISO week number (e.g. Week 42) in the top header.">
+                                    <ToggleSwitch x:Name="ToggleCalendarWeekNumber" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Status Note -->
+                                <labs:SettingsCard Header="Show Agenda Note" Description="Display calendar status or reminder text.">
+                                    <ToggleSwitch x:Name="ToggleCalendarShowEventNote" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Custom Status Note Text -->
+                                <labs:SettingsCard Header="Custom Agenda Note" Description="Custom text displayed underneath the month/year when live sync is off.">
+                                    <TextBox x:Name="TxtCalendarCustomNote" Width="240" TextChanged="OnSettingChanged" PlaceholderText="No upcoming calendar conflicts"/>
+                                </labs:SettingsCard>
+
+                                <!-- Live Calendar Sync -->
+                                <labs:SettingsCard Header="Sync Live Calendar Events" Description="Fetch upcoming meetings and schedule items from Windows Calendar or custom iCal feed.">
+                                    <ToggleSwitch x:Name="ToggleCalendarLiveEvents" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- iCal URL or File Path -->
+                                <labs:SettingsCard Header="iCal URL or .ics File Path" Description="Online webcal/http feed or local .ics calendar file. Leave empty to use Windows Calendar.">
+                                    <TextBox x:Name="TxtCalendarIcsPath" Width="260" TextChanged="OnSettingChanged" PlaceholderText="e.g. https://.../calendar.ics or C:\path\events.ics"/>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- Wisdom & Quotes (KnowledgeBase SQLite) Widget SettingsExpander -->
+                        <labs:SettingsExpander x:Name="ExpanderQuoteWidget"
+                                               Header="Wisdom &amp; Quotes (KnowledgeBase)"
+                                               Description="Display your personal quotes and sayings from your SQLite knowledge base with offline fallback cache."
+                                               IsExpanded="True">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE90B;"/>
+                            </labs:SettingsExpander.HeaderIcon>
+                            <ToggleSwitch x:Name="ToggleQuoteWidget" Toggled="OnSettingChanged"/>
+
+                            <labs:SettingsExpander.Items>
+                                <!-- Live Interactive Design Preview Stage inside the Quotes Collapsible -->
+                                <labs:SettingsCard HorizontalContentAlignment="Stretch" ContentAlignment="Vertical">
+                                    <Grid RowSpacing="10" Margin="0,4,0,4">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Preview Stage Header Bar -->
+                                        <Grid Grid.Row="0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE790;" FontSize="13" Foreground="#D4B483" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Live Quote Design Preview" FontWeight="SemiBold" FontSize="13.5" VerticalAlignment="Center"/>
+                                                <TextBlock Text="• Real-time preview of your typography, opacity, border &amp; theme"
+                                                           FontSize="12"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                <Button x:Name="BtnNextQuoteLivePreview"
+                                                        Click="OnNextQuotePreviewClicked"
+                                                        Padding="10,5"
+                                                        CornerRadius="6"
+                                                        ToolTipService.ToolTip="Cycle to another quote from your database">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <FontIcon Glyph="&#xE72C;" FontSize="11"/>
+                                                        <TextBlock Text="Sample Another Quote" FontSize="12"/>
+                                                    </StackPanel>
+                                                </Button>
+                                                <Button x:Name="BtnResetQuoteDesign"
+                                                        Click="OnResetQuoteDesignClicked"
+                                                        Padding="10,5"
+                                                        CornerRadius="6"
+                                                        ToolTipService.ToolTip="Reset quote typography, colors, and opacity to defaults">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                                        <FontIcon Glyph="&#xE777;" FontSize="11"/>
+                                                        <TextBlock Text="Reset Style" FontSize="12"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <!-- Dark Wallpaper Stage with Live StylizedQuoteWidget -->
+                                        <Border Grid.Row="1"
+                                                MinHeight="205"
+                                                CornerRadius="10"
+                                                BorderThickness="1"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                Background="#0E1017">
+                                            <Grid CornerRadius="9">
+                                                <!-- User's Current Screensaver Wallpaper Backdrop -->
+                                                <Image x:Name="ImgQuoteLivePreviewBg"
+                                                       Stretch="UniformToFill"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+
+                                                <!-- Atmospheric Dark Scrim for Lock-Screen Realism -->
+                                                <Border>
+                                                    <Border.Background>
+                                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                            <GradientStop Color="#6608090F" Offset="0.0"/>
+                                                            <GradientStop Color="#8808090F" Offset="1.0"/>
+                                                        </LinearGradientBrush>
+                                                    </Border.Background>
+                                                </Border>
+
+                                                <!-- Live 1:1 Quote Widget Preview -->
+                                                <Grid Padding="24,22,24,22" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <controls:StylizedQuoteWidget x:Name="LivePreviewQuoteCard"
+                                                                                  QuoteScale="1.0"
+                                                                                  HorizontalAlignment="Center"
+                                                                                  VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </labs:SettingsCard>
+
+                                <!-- KnowledgeBase SQLite Source Path -->
+                                <labs:SettingsCard Header="KnowledgeBase Source Location" Description="Path to your brain.db file or KnowledgeBase-Quotes folder. Can be relocated anytime.">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBox x:Name="TxtQuoteDbPath"
+                                                 Width="260"
+                                                 TextChanged="OnSettingChanged"
+                                                 PlaceholderText="Path to quotes SQLite database (.db)..."
+                                                 ToolTipService.ToolTip="Full path to brain.db or KnowledgeBase-Quotes folder"/>
+                                        <Button x:Name="BtnBrowseQuoteDb"
+                                                Click="OnBrowseQuoteDbClicked"
+                                                ToolTipService.ToolTip="Select a SQLite .db file">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8E5;" FontSize="12"/>
+                                                <TextBlock Text="Browse .db"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="BtnBrowseQuoteFolder"
+                                                Click="OnBrowseQuoteFolderClicked"
+                                                ToolTipService.ToolTip="Select the KnowledgeBase-Quotes folder">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="12"/>
+                                                <TextBlock Text="Folder"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Database Status & Shuffle Action -->
+                                <labs:SettingsCard Header="Database Sync &amp; Cache Status" Description="Quotes are automatically cached locally so the widget works even if the source folder moves or syncs.">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="6" Padding="10,5" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon x:Name="IconQuoteDbStatus" Glyph="&#xE73E;" FontSize="12" Foreground="#60CDFF" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TxtQuoteDbStatus" Text="Connected • 15 items" FontSize="12" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Button x:Name="BtnNextQuotePreview"
+                                                Click="OnNextQuotePreviewClicked"
+                                                ToolTipService.ToolTip="Reload database and cycle to next quote">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE72C;" FontSize="12"/>
+                                                <TextBlock Text="Next Quote"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Color Theme Palette -->
+                                <labs:SettingsCard Header="Quote Color Theme" Description="Curated literary color palettes for the quote text, decorative ornament, author, and divider.">
+                                    <ComboBox x:Name="ComboQuoteColorTheme" SelectionChanged="OnSettingChanged" Width="250">
+                                        <ComboBoxItem Content="Warm Cream &amp; Muted Gold"/>
+                                        <ComboBoxItem Content="Crisp White &amp; Silver"/>
+                                        <ComboBoxItem Content="Soft Lavender &amp; Moonlight"/>
+                                        <ComboBoxItem Content="Sage &amp; Parchment"/>
+                                        <ComboBoxItem Content="Windows System Accent"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Background Opacity (0% Floating Text to 100% Solid Matte) -->
+                                <labs:SettingsCard Header="Card Background Opacity" Description="Adjust surface translucency (set to 0% for floating poetry directly over wallpaper).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteBgOpacity" Minimum="0" Maximum="100" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteBgOpacity" Text="85%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Show Card Border -->
+                                <labs:SettingsCard Header="Show Card Hairline Border" Description="Display the subtle warm hairline border around the quote card.">
+                                    <ToggleSwitch x:Name="ToggleQuoteShowBorder" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Frosted Blur Effect -->
+                                <labs:SettingsCard Header="Card Blur Effect" Description="Apply a soft frosted backdrop blur behind the quote card.">
+                                    <ToggleSwitch x:Name="ToggleQuoteBlurEffect" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Backdrop Material Theme -->
+                                <labs:SettingsCard Header="Backdrop Material Theme" Description="Choose between Windows 11 In-App Acrylic, Custom Frosted Blur, or Mica Satin Simulation.">
+                                    <ComboBox x:Name="ComboQuoteBackdropTheme" SelectionChanged="OnSettingChanged" Width="230">
+                                        <ComboBoxItem Content="Acrylic (Windows 11 Frosted)"/>
+                                        <ComboBoxItem Content="Custom Frosted Blur"/>
+                                        <ComboBoxItem Content="Mica Satin (Subtle Luster)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Blur Intensity -->
+                                <labs:SettingsCard Header="Blur Intensity" Description="Adjust backdrop blur radius from subtle lens (4px) to dense frosted fog (60px).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteBlurIntensity" Minimum="4" Maximum="60" StepFrequency="2" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteBlurIntensity" Text="18 px" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Quote Font Family Style -->
+                                <labs:SettingsCard Header="Quote Font Style" Description="Typography style for the primary quote or saying.">
+                                    <ComboBox x:Name="ComboQuoteFontStyle" SelectionChanged="OnSettingChanged" Width="230">
+                                        <ComboBoxItem Content="Literary Serif"/>
+                                        <ComboBoxItem Content="Modern Display Sans"/>
+                                        <ComboBoxItem Content="Classic Book Antiqua"/>
+                                        <ComboBoxItem Content="Monospace"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Main Quote Font Size -->
+                                <labs:SettingsCard Header="Main Quote Font Size" Description="Adjust the font size and line height of the primary quote text (12pt – 28pt).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteMainFontSize" Minimum="12" Maximum="28" StepFrequency="1" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteMainFontSize" Text="16 pt" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Meaning & Secondary Label Font Size -->
+                                <labs:SettingsCard Header="Meaning &amp; Label Font Size" Description="Adjust the font size of the meaning paragraph, author line, and category header (9pt – 16pt).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteMeaningFontSize" Minimum="9" Maximum="16" StepFrequency="0.5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteMeaningFontSize" Text="11.5 pt" VerticalAlignment="Center" Width="50" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Text Alignment -->
+                                <labs:SettingsCard Header="Text Alignment" Description="Choose between left-aligned editorial layout or centered lock-screen poetry.">
+                                    <ComboBox x:Name="ComboQuoteAlignment" SelectionChanged="OnSettingChanged" Width="230">
+                                        <ComboBoxItem Content="Left-Aligned Editorial"/>
+                                        <ComboBoxItem Content="Centered Poetry"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Card Width -->
+                                <labs:SettingsCard Header="Quote Card Width" Description="Adjust the horizontal width and text wrapping proportion of the quote card (260px – 520px).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteCardWidth" Minimum="260" Maximum="520" StepFrequency="10" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteCardWidth" Text="340 px" VerticalAlignment="Center" Width="50" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Quote Widget Scale -->
+                                <labs:SettingsCard Header="Overall Overlay Scale" Description="Scale the entire quotes &amp; sayings widget proportionally.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderQuoteScale" Minimum="50" Maximum="180" StepFrequency="5" Width="160" ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtQuoteScale" Text="100%" VerticalAlignment="Center" Width="45" FontSize="13"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Show Category Header (QUOTE / SAYING) -->
+                                <labs:SettingsCard Header="Show Category Header (QUOTE / SAYING)" Description="Display the decorative quotation mark ornament and category label at the top.">
+                                    <ToggleSwitch x:Name="ToggleQuoteShowCategory" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Author & Source -->
+                                <labs:SettingsCard Header="Show Author &amp; Source" Description="Display the author and source attribution line when present in the database.">
+                                    <ToggleSwitch x:Name="ToggleQuoteShowAuthor" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Show Origin & Context Meaning -->
+                                <labs:SettingsCard Header="Show Origin &amp; Cultural Meaning" Description="Display the reflective meaning or context paragraph below a subtle hairline divider.">
+                                    <ToggleSwitch x:Name="ToggleQuoteShowMeaning" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- Quote Rotation Interval -->
+                                <labs:SettingsCard Header="Quote Rotation Interval" Description="How often to cross-fade to a new quote or saying on the screensaver.">
+                                    <ComboBox x:Name="ComboQuoteRotation" SelectionChanged="OnSettingChanged" Width="230">
+                                        <ComboBoxItem Content="Every 15 Seconds"/>
+                                        <ComboBoxItem Content="Every 30 Seconds (Default)"/>
+                                        <ComboBoxItem Content="Every 1 Minute"/>
+                                        <ComboBoxItem Content="Every 5 Minutes"/>
+                                        <ComboBoxItem Content="Static (Change on Start)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- COMMON WIDGET LAYOUT & POSITION SECTION -->
+                        <TextBlock Text="Widget Screen Layout &amp; Positioning" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,20,0,4"/>
+                        <TextBlock Text="Arrange where enabled widgets appear on your display, or use the Windows 11 Lock-Screen horizontal dock layout." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+
+                        <!-- Widget Accent Palette Picker -->
+                        <labs:SettingsCard x:Name="CardWidgetAccentStyle" Header="Widget Accent Palette" Description="Choose between the calm Windows 11 lock-screen palette (#60CDFF + warm sun) or syncing with your Windows system accent color.">
+                            <ComboBox x:Name="ComboWidgetAccentStyle" SelectionChanged="OnSettingChanged" Width="240">
+                                <ComboBoxItem Content="Win11 Calm Palette (Default)"/>
+                                <ComboBoxItem Content="Windows System Accent"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <!-- Periodic Position Drift Toggle -->
+                        <labs:SettingsCard Header="Periodic Position Drift" Description="Automatically move widgets to random screen positions over time with smooth crossfading to prevent OLED burn-in.">
+                            <ToggleSwitch x:Name="TogglePositionShuffle" Toggled="OnSettingChanged"/>
+                        </labs:SettingsCard>
+
+                        <!-- Shuffle Interval Picker -->
+                        <labs:SettingsCard x:Name="CardShuffleInterval" Header="Position Change Interval" Description="Choose how often widgets change position across the 9 screen zones.">
+                            <ComboBox x:Name="ComboShuffleInterval" SelectionChanged="OnSettingChanged" Width="200">
+                                <ComboBoxItem Content="Every 10 Seconds"/>
+                                <ComboBoxItem Content="Every 30 Seconds"/>
+                                <ComboBoxItem Content="Every 1 Minute"/>
+                                <ComboBoxItem Content="Every 5 Minutes"/>
+                            </ComboBox>
+                        </labs:SettingsCard>
+
+                        <!-- MODERN FLUENT SCREEN PLACEMENT & LAYOUT CONTAINER -->
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="20"
+                                Margin="0,8,0,0">
+                            <Grid ColumnSpacing="24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="310"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- LEFT SIDE: Guided Instructions & Widget Palette -->
+                                <StackPanel Grid.Column="0" Orientation="Vertical" Spacing="16" VerticalAlignment="Center">
+                                    <!-- Header & Description -->
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Screen Placement &amp; Layout" Style="{StaticResource SubtitleTextBlockStyle}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Drag a widget badge onto the monitor, or click any zone to place it. Multiple widgets in the same zone stack side-by-side."
+                                                   Style="{StaticResource BodyTextBlockStyle}"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+
+                                    <!-- Widget Badges Tray -->
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Available Widgets" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                        
+                                        <!-- Row 1: Clock & Weather -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <!-- Clock Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgeClockWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Clock"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="Clock (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE823;" FontSize="13" Foreground="#D0FFFFFF"/>
+                                                    <TextBlock Text="Clock" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Weather Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgeWeatherWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Weather"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="Weather (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE753;" FontSize="13" Foreground="#F5C84C"/>
+                                                    <TextBlock Text="Weather" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+
+                                        <!-- Row 2: Media & Performance -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <!-- Media Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgeMediaWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Media"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="Now Playing Media (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xEC4F;" FontSize="13" Foreground="#60CDFF"/>
+                                                    <TextBlock Text="Media" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Performance Monitor Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgePerformanceWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Performance"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="System Utilization Meters (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE950;" FontSize="13" Foreground="#60CDFF"/>
+                                                    <TextBlock Text="System" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+
+                                        <!-- Row 3: Calendar & Quotes -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <!-- Calendar Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgeCalendarWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Calendar"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="Calendar &amp; Agenda (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE787;" FontSize="13" Foreground="#60CDFF"/>
+                                                    <TextBlock Text="Calendar" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <!-- Quotes Widget (Draggable Pill) -->
+                                            <Button x:Name="BadgeQuoteWidget"
+                                                    CanDrag="True"
+                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                    Click="OnWidgetBadgeClicked"
+                                                    Tag="Quote"
+                                                    CornerRadius="16"
+                                                    Padding="12,6"
+                                                    ToolTipService.ToolTip="Wisdom &amp; Quotes (Drag onto monitor or click to toggle)">
+                                                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE90B;" FontSize="13" Foreground="#60CDFF"/>
+                                                    <TextBlock Text="Quotes" FontWeight="SemiBold" FontSize="12"/>
+                                                    <Border Background="{ThemeResource AccentFillColorDefaultBrush}" CornerRadius="6" Padding="6,1">
+                                                        <TextBlock Text="Active" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <!-- 1-Click Windows 11 Lock-Screen Row Preset Button -->
+                                    <Button x:Name="BtnPresetLockScreenRow"
+                                            Click="OnPresetLockScreenRowClicked"
+                                            HorizontalAlignment="Stretch"
+                                            CornerRadius="6"
+                                            Padding="12,8"
+                                            ToolTipService.ToolTip="Place Clock at Top-Center and dock Weather, Calendar, Media, and System in a horizontal row at Bottom-Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <FontIcon Glyph="&#xE7F4;" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                            <TextBlock Text="Apply Win11 Lock-Screen Row Layout" FontSize="12" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                    </Button>
+
+                                    <!-- Quick Tips Card -->
+                                    <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="6" Padding="12,10">
+                                        <StackPanel Spacing="4">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE946;" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                                <TextBlock Text="Quick Tips" FontSize="11" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                            <TextBlock Text="• Drag any badge onto the monitor zones&#x0a;• Click any zone to open placement menu&#x0a;• Widgets in the same zone stack horizontally"
+                                                       FontSize="11"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       LineHeight="16"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- RIGHT SIDE: Large Interactive Desktop Monitor Mockup -->
+                                <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="10" HorizontalAlignment="Center">
+                                    <!-- Compact Status Bar -->
+                                    <Grid Width="390" Margin="0,0,0,4">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}" CornerRadius="6" Padding="8,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE7F4;" FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                                    <TextBlock x:Name="TxtStatusPlacement" Text="Widgets Active" FontSize="12" FontWeight="SemiBold"/>
+                                                    <TextBlock x:Name="TxtClockPositionName" Text="Top-Center" Visibility="Collapsed"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <!-- Remove (×) Button -->
+                                            <Button x:Name="BtnRemovePlacement"
+                                                    Click="OnRemoveWidgetPlacementClicked"
+                                                    Padding="6,4"
+                                                    CornerRadius="4"
+                                                    ToolTipService.ToolTip="Disable all widgets">
+                                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE711;" FontSize="10"/>
+                                                    <TextBlock Text="Clear All" FontSize="11"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+
+                                        <TextBlock Text="16:9 Display Preview" FontSize="11" Foreground="{ThemeResource TextFillColorTertiaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <!-- Screen & Bezel -->
+                                    <Border Width="390" Height="219"
+                                            Background="#111216"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="3"
+                                            CornerRadius="10">
+                                        <Grid CornerRadius="7">
+                                            <!-- Wallpaper Image (Current screensaver media) -->
+                                            <Image x:Name="ImgMiniMonitorWallpaper"
+                                                   Stretch="UniformToFill"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+
+                                            <!-- Fluent Acrylic Dark Scrim -->
+                                            <Border Background="#55000000"/>
+
+                                            <!-- Soft Empty State (Visible when no widgets placed) -->
+                                            <Grid x:Name="PanelEmptyPlacementState"
+                                                  Visibility="Collapsed"
+                                                  IsHitTestVisible="False"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center">
+                                                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                                    <Border Width="42" Height="42" CornerRadius="21" Background="#26FFFFFF" HorizontalAlignment="Center">
+                                                        <FontIcon Glyph="&#xE7F4;" FontSize="18" Foreground="#CCFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <TextBlock Text="Drop widgets here to start customizing"
+                                                               FontSize="12"
+                                                               Foreground="#CCFFFFFF"
+                                                               FontWeight="Medium"
+                                                               HorizontalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Grid>
+
+                                            <!-- 3x3 Clickable & Droppable Screen Zones Grid -->
+                                            <Grid RowSpacing="6" ColumnSpacing="6" Padding="8">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="*"/>
+                                                    <RowDefinition Height="*"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <!-- Row 0: Top-Left, Top-Center, Top-Right -->
+                                                <Button x:Name="BtnPosTopLeft" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="TopLeft"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Top-Left Zone">
+                                                    <Border x:Name="DotPosTopLeft" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Top-Left" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|TopLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="TopLeft" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosTopCenter" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="TopCenter"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Top-Center Zone">
+                                                    <Border x:Name="DotPosTopCenter" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Top-Center" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|TopCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="TopCenter" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosTopRight" Grid.Row="0" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="TopRight"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Top-Right Zone">
+                                                    <Border x:Name="DotPosTopRight" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Top-Right" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|TopRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="TopRight" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <!-- Row 1: Center-Left, Center, Center-Right -->
+                                                <Button x:Name="BtnPosCenterLeft" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="CenterLeft"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Center-Left Zone">
+                                                    <Border x:Name="DotPosCenterLeft" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Center-Left" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|CenterLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="CenterLeft" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosCenter" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="Center"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Center Zone">
+                                                    <Border x:Name="DotPosCenter" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Center" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|Center" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="Center" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosCenterRight" Grid.Row="1" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="CenterRight"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Center-Right Zone">
+                                                    <Border x:Name="DotPosCenterRight" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Center-Right" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|CenterRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="CenterRight" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <!-- Row 2: Bottom-Left, Bottom-Center, Bottom-Right -->
+                                                <Button x:Name="BtnPosBottomLeft" Grid.Row="2" Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="BottomLeft"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Bottom-Left Zone">
+                                                    <Border x:Name="DotPosBottomLeft" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Bottom-Left" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|BottomLeft" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="BottomLeft" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosBottomCenter" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="BottomCenter"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Bottom-Center Zone">
+                                                    <Border x:Name="DotPosBottomCenter" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Bottom-Center" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|BottomCenter" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="BottomCenter" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <Button x:Name="BtnPosBottomRight" Grid.Row="2" Grid.Column="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="0" Tag="BottomRight"
+                                                        Click="OnWidgetPositionClicked" AllowDrop="True" DragOver="OnMonitorZoneDragOver" DragLeave="OnMonitorZoneDragLeave" Drop="OnMonitorZoneDrop"
+                                                        KeyDown="OnMonitorZoneKeyDown" UseSystemFocusVisuals="False" CornerRadius="6" ToolTipService.ToolTip="Bottom-Right Zone">
+                                                    <Border x:Name="DotPosBottomRight" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <TextBlock Text="Bottom-Right" FontSize="10" Foreground="#85FFFFFF" FontWeight="Medium" IsHitTestVisible="False"/>
+                                                    </Border>
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuFlyoutItem Text="Place Clock" Tag="Clock|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE823;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Weather" Tag="Weather|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE753;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Media" Tag="Media|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE768;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Performance" Tag="Performance|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE950;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Calendar" Tag="Calendar|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE787;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutItem Text="Place Quotes" Tag="Quote|BottomRight" Click="OnFlyoutPlaceWidgetClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE90B;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                            <MenuFlyoutSeparator/>
+                                                            <MenuFlyoutItem Text="Clear Zone" Tag="BottomRight" Click="OnFlyoutClearZoneClicked">
+                                                                <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE711;"/></MenuFlyoutItem.Icon>
+                                                            </MenuFlyoutItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+
+                                                <!-- Live Mini Previews for Independent Overlays (Clock & Literary Quotes) -->
+                                                <controls:StylizedClockWidget x:Name="MiniPreviewClockWidget"
+                                                                              Grid.Row="0" Grid.Column="1"
+                                                                              ClockScale="0.26"
+                                                                              CanDrag="True"
+                                                                              DragStarting="OnWidgetBadgeDragStarting"
+                                                                              Tag="Clock"
+                                                                              Tapped="OnPlacedClockWidgetTapped"
+                                                                              HorizontalAlignment="Center"
+                                                                              VerticalAlignment="Center"/>
+
+                                                <controls:StylizedQuoteWidget x:Name="MiniPreviewQuoteWidget"
+                                                                              Grid.Row="1" Grid.Column="1"
+                                                                              QuoteScale="0.26"
+                                                                              CanDrag="True"
+                                                                              DragStarting="OnWidgetBadgeDragStarting"
+                                                                              Tag="Quote"
+                                                                              HorizontalAlignment="Center"
+                                                                              VerticalAlignment="Center"
+                                                                              Visibility="Collapsed"/>
+
+                                                <!-- 9 Auto-Stacking Horizontal Mini Zone Docks (Functional Utility Cards) -->
+                                                <StackPanel x:Name="MiniZoneStackTopLeft" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                                <StackPanel x:Name="MiniZoneStackTopCenter" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <StackPanel x:Name="MiniZoneStackTopRight" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"/>
+
+                                                <StackPanel x:Name="MiniZoneStackCenterLeft" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                                <StackPanel x:Name="MiniZoneStackCenter" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                <StackPanel x:Name="MiniZoneStackCenterRight" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"/>
+
+                                                <StackPanel x:Name="MiniZoneStackBottomLeft" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                                <StackPanel x:Name="MiniZoneStackBottomCenter" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    <controls:StylizedWeatherWidget x:Name="MiniPreviewWeatherWidget"
+                                                                                    WeatherScale="0.25"
+                                                                                    CanDrag="True"
+                                                                                    DragStarting="OnWidgetBadgeDragStarting"
+                                                                                    Tag="Weather"
+                                                                                    Visibility="Collapsed"/>
+
+                                                    <controls:StylizedCalendarWidget x:Name="MiniPreviewCalendarWidget"
+                                                                                     CalendarScale="0.25"
+                                                                                     CanDrag="True"
+                                                                                     DragStarting="OnWidgetBadgeDragStarting"
+                                                                                     Tag="Calendar"
+                                                                                     Visibility="Collapsed"/>
+
+                                                    <controls:StylizedMediaWidget x:Name="MiniPreviewMediaWidget"
+                                                                                  MediaScale="0.25"
+                                                                                  CanDrag="True"
+                                                                                  DragStarting="OnWidgetBadgeDragStarting"
+                                                                                  Tag="Media"
+                                                                                  Visibility="Collapsed"/>
+
+                                                    <controls:StylizedPerformanceWidget x:Name="MiniPreviewPerformanceWidget"
+                                                                                        PerformanceScale="0.25"
+                                                                                        CanDrag="True"
+                                                                                        DragStarting="OnWidgetBadgeDragStarting"
+                                                                                        Tag="Performance"
+                                                                                        Visibility="Collapsed"/>
+                                                </StackPanel>
+                                                <StackPanel x:Name="MiniZoneStackBottomRight" Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                            </Grid>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Monitor Stand Neck & Base -->
+                                    <Border Width="32" Height="14" Background="{ThemeResource CardStrokeColorDefaultBrush}" HorizontalAlignment="Center"/>
+                                    <Border Width="110" Height="6" CornerRadius="3" Background="{ThemeResource CardStrokeColorDefaultBrush}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </NavigationView>
+
+        <!-- SOURCE TRANSITIONS & EFFECTS DIALOG -->
+        <ContentDialog x:Name="DialogSourceEffects"
+                       Title="Transitions &amp; Effects"
+                       PrimaryButtonText="Done"
+                       SecondaryButtonText="Reset to Defaults"
+                       DefaultButton="Primary"
+                       PrimaryButtonClick="OnSourceEffectsDoneClicked"
+                       SecondaryButtonClick="OnSourceEffectsResetClicked">
+            <StackPanel Spacing="16" Width="440">
+                <StackPanel Spacing="2">
+                    <TextBlock x:Name="TxtDialogSourceTitle" Text="Folder Name" FontWeight="SemiBold" FontSize="15" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock x:Name="TxtDialogSourcePath" Text="C:\Path\To\Folder" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+
+                <!-- Transition Style -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Transition Style" FontWeight="Medium" FontSize="13"/>
+                    <ComboBox x:Name="ComboDialogTransitionStyle" HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Crossfade (Smooth Blend)"/>
+                        <ComboBoxItem Content="Fade to Black (Cinema Cut)"/>
+                        <ComboBoxItem Content="Slide (Push)"/>
+                        <ComboBoxItem Content="Cut (Instant Swap)"/>
+                    </ComboBox>
+                </StackPanel>
+
+                <!-- Transition Duration -->
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <TextBlock Text="Transition Duration" FontWeight="Medium" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtDialogTransitionDuration" Text="1.5s" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Grid>
+                    <Slider x:Name="SliderDialogTransitionDuration" Minimum="0.2" Maximum="4.0" StepFrequency="0.2" ValueChanged="OnDialogSettingChanged"/>
+                </StackPanel>
+
+                <!-- Photo Display Duration -->
+                <StackPanel Spacing="4">
+                    <Grid>
+                        <TextBlock Text="Photo Display Duration" FontWeight="Medium" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtDialogPhotoDuration" Text="8s" FontWeight="SemiBold" HorizontalAlignment="Right" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                    </Grid>
+                    <Slider x:Name="SliderDialogPhotoDuration" Minimum="3" Maximum="30" StepFrequency="1" ValueChanged="OnDialogSettingChanged"/>
+                </StackPanel>
+
+                <!-- Ken Burns Motion -->
+                <Grid>
+                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="Ken Burns Motion on Photos" FontWeight="Medium" FontSize="13"/>
+                        <TextBlock Text="Subtle pan and zoom animation for still images." FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    </StackPanel>
+                    <ToggleSwitch x:Name="ToggleDialogKenBurns" HorizontalAlignment="Right" Margin="0,-4,0,0"/>
+                </Grid>
+
+                <!-- Screen Fit Mode -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Screen Fit Mode" FontWeight="Medium" FontSize="13"/>
+                    <ComboBox x:Name="ComboDialogFitMode" HorizontalAlignment="Stretch">
+                        <ComboBoxItem Content="Fill Screen (Crop to Fill)"/>
+                        <ComboBoxItem Content="Fit to Screen (Letterbox / Black Bars)"/>
+                        <ComboBoxItem Content="Stretch to Fill"/>
+                        <ComboBoxItem Content="Center 1:1 (No Scaling)"/>
+                    </ComboBox>
+                </StackPanel>
+            </StackPanel>
+        </ContentDialog>
+    </Grid>
+</Page>

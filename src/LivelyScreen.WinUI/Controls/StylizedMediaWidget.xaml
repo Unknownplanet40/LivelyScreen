@@ -1,0 +1,122 @@
+<UserControl
+    x:Class="LivelyScreen_WinUI.Controls.StylizedMediaWidget"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootContainer" Width="244" Height="108" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Viewbox Stretch="Uniform">
+            <!-- Official Windows 11 Lock-Screen Card -->
+            <Border x:Name="PillBackdrop"
+                    Width="244"
+                    Height="108"
+                    CornerRadius="10"
+                    BorderThickness="1"
+                    BorderBrush="#22FFFFFF"
+                    Background="#B8141720"
+                    Padding="14,11,14,10">
+
+            <Grid RowSpacing="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Row 0: Card Header (Now Playing + Status) -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <FontIcon Glyph="&#xEC4F;" FontSize="11" Foreground="#A8FFFFFF" VerticalAlignment="Center"/>
+                        <TextBlock Text="Now Playing"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="11.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="#B5FFFFFF"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock x:Name="TxtPlaybackStatus"
+                               Grid.Column="1"
+                               Text="Idle"
+                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                               FontSize="10.5"
+                               FontWeight="Medium"
+                               Foreground="#7AFFFFFF"
+                               VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Row 1: Play/Album Art Tile + Track Details -->
+                <Grid Grid.Row="1" VerticalAlignment="Center" ColumnSpacing="11">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Album Art Thumbnail / Subtle Play Icon Box -->
+                    <Grid Grid.Column="0" Width="36" Height="36" CornerRadius="8" VerticalAlignment="Center">
+                        <Image x:Name="ImgAlbumArt" Stretch="UniformToFill" Visibility="Collapsed"/>
+                        <Border x:Name="BorderIconPlaceholder"
+                                Background="#14FFFFFF"
+                                BorderBrush="#1AFFFFFF"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <FontIcon x:Name="IconPlaybackStatus"
+                                      Glyph="&#xE768;"
+                                      FontSize="14"
+                                      Foreground="#60CDFF"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+                    </Grid>
+
+                    <!-- Track & Source Info -->
+                    <StackPanel Grid.Column="1" Orientation="Vertical" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock x:Name="TxtTitle"
+                                   Text="Ready for Music"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Foreground="#F8FFFFFF"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="TxtArtist"
+                                   Text="Spotify • Apple Music • Web"
+                                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                                   FontSize="11"
+                                   Foreground="#8AFFFFFF"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Row 2: Footer & Live Audio Spectrum Visualizer -->
+                <Grid Grid.Row="2" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0"
+                               Text="System Media Transport Controls"
+                               FontFamily="Segoe UI Variable Text, Segoe UI"
+                               FontSize="10.5"
+                               Foreground="#68FFFFFF"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Audio Spectrum Bars -->
+                    <StackPanel x:Name="PanelSpectrum" Grid.Column="1" Orientation="Horizontal" Spacing="2" Height="14" VerticalAlignment="Center">
+                        <Border x:Name="Bar0" Width="3" Height="3" CornerRadius="1.5" Background="#60CDFF" VerticalAlignment="Bottom"/>
+                        <Border x:Name="Bar1" Width="3" Height="3" CornerRadius="1.5" Background="#60CDFF" VerticalAlignment="Bottom"/>
+                        <Border x:Name="Bar2" Width="3" Height="3" CornerRadius="1.5" Background="#60CDFF" VerticalAlignment="Bottom"/>
+                        <Border x:Name="Bar3" Width="3" Height="3" CornerRadius="1.5" Background="#60CDFF" VerticalAlignment="Bottom"/>
+                        <Border x:Name="Bar4" Width="3" Height="3" CornerRadius="1.5" Background="#60CDFF" VerticalAlignment="Bottom"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+            </Border>
+        </Viewbox>
+    </Grid>
+</UserControl>
