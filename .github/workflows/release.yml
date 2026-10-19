@@ -38,5 +38,4 @@ jobs:
         with:
           files: |
             LivelyScreen-win-x64.zip
-            src/LivelyScreen.WinUI/bin/Release/net9.0-windows10.0.26100.0/win-x64/publish/LivelyScreen.exe
           generate_release_notes: true
