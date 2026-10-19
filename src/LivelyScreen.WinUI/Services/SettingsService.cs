@@ -38,6 +38,10 @@ public class SettingsService
                 var loaded = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions);
                 if (loaded != null)
                 {
+                    if (string.Equals(loaded.Hotkey, "Win+Ctrl+S", StringComparison.OrdinalIgnoreCase))
+                    {
+                        loaded.Hotkey = "Ctrl+Alt+S";
+                    }
                     Current = loaded;
                     SettingsChanged?.Invoke(Current);
                     return;

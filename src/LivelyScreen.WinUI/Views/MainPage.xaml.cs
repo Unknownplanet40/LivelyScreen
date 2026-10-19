@@ -21,6 +21,7 @@ public sealed partial class MainPage : Page
     private MediaLibrary? _mediaLibrary;
     private IdleDetector? _idleDetector;
     private ScreensaverManager? _screensaverManager;
+    private Window? _window;
     private IntPtr _windowHandle = IntPtr.Zero;
     private bool _isInitializing = true;
 
@@ -46,6 +47,7 @@ public sealed partial class MainPage : Page
         IdleDetector idleDetector,
         ScreensaverManager screensaverManager)
     {
+        _window = window;
         _windowHandle = WindowNative.GetWindowHandle(window);
         _settingsService = settingsService;
         _mediaLibrary = mediaLibrary;
@@ -75,6 +77,22 @@ public sealed partial class MainPage : Page
 
         ToggleAutoStart.IsOn = AutoStartService.IsAutoStartEnabled();
         ToggleSmartPause.IsOn = s.SmartPauseInFullscreen;
+
+        if (ComboHotkey != null)
+        {
+            string currentKey = s.Hotkey ?? "Ctrl+Alt+S";
+            int matchIdx = -1;
+            for (int i = 0; i < ComboHotkey.Items.Count; i++)
+            {
+                if (ComboHotkey.Items[i] is ComboBoxItem item && string.Equals(item.Tag as string, currentKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchIdx = i;
+                    break;
+                }
+            }
+            ComboHotkey.SelectedIndex = matchIdx >= 0 ? matchIdx : 0;
+        }
+        UpdateHotkeyUI(s.Hotkey ?? "Ctrl+Alt+S");
 
         ComboDisplayMode.SelectedIndex = (int)s.DisplayMode;
         UpdateScreenInfo();
@@ -1075,6 +1093,56 @@ public sealed partial class MainPage : Page
                     App.Log($"Dynamic theme exported: {savePath}");
                 }
             }
+        }
+    }
+
+    private void UpdateHotkeyUI(string hotkey, bool registrationSucceeded = true)
+    {
+        string displayHotkey = hotkey switch
+        {
+            "None" or "" => "None",
+            "Ctrl+Alt+S" => "Ctrl + Alt + S",
+            "Ctrl+Shift+F12" => "Ctrl + Shift + F12",
+            "Win+Alt+S" => "Win + Alt + S",
+            "Ctrl+Alt+L" => "Ctrl + Alt + L",
+            "Ctrl+Shift+K" => "Ctrl + Shift + K",
+            "Ctrl+Shift+S" => "Ctrl + Shift + S",
+            "Win+Ctrl+S" => "Win + Ctrl + S",
+            _ => hotkey.Replace("+", " + ")
+        };
+
+        if (TxtHotkeyHint != null)
+        {
+            TxtHotkeyHint.Text = hotkey == "None" ? "Hotkey: Disabled" : $"Hotkey: {displayHotkey}";
+        }
+
+        if (BtnPreviewNow != null)
+        {
+            ToolTipService.SetToolTip(BtnPreviewNow, hotkey == "None" ? "Start Screensaver" : $"Start Screensaver ({displayHotkey})");
+        }
+
+        if (TxtHotkeyConflictWarn != null)
+        {
+            TxtHotkeyConflictWarn.Visibility = registrationSucceeded ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+    private void OnHotkeySelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null) return;
+
+        if (ComboHotkey?.SelectedItem is ComboBoxItem item && item.Tag is string keyTag)
+        {
+            _settingsService.Current.Hotkey = keyTag;
+            _settingsService.Save();
+
+            bool ok = true;
+            if (_window is MainWindow mw)
+            {
+                ok = mw.RegisterGlobalHotkey(keyTag);
+            }
+
+            UpdateHotkeyUI(keyTag, ok);
         }
     }
 

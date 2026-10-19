@@ -67,13 +67,13 @@
                             Click="OnPreviewNowClicked"
                             Style="{StaticResource AccentButtonStyle}"
                             HorizontalAlignment="Stretch"
-                            ToolTipService.ToolTip="Start Screensaver (Win + Ctrl + S)">
+                            ToolTipService.ToolTip="Start Screensaver (Ctrl + Alt + S)">
                         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
                             <FontIcon Glyph="&#xE768;" FontSize="13"/>
                             <TextBlock x:Name="TxtPreviewBtnText" Text="Start Screensaver"/>
                         </StackPanel>
                     </Button>
-                    <TextBlock x:Name="TxtHotkeyHint" Text="Hotkey: Win + Ctrl + S" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TxtHotkeyHint" Text="Hotkey: Ctrl + Alt + S" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="11" HorizontalAlignment="Center"/>
                 </StackPanel>
             </NavigationView.PaneFooter>
 
@@ -120,9 +120,24 @@
                         </labs:SettingsCard>
 
                         <labs:SettingsCard Header="Instant Activation Hotkey" Description="Global hotkey to start screensaver instantly anytime.">
-                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="4" Padding="10,4">
-                                <TextBlock Text="Win + Ctrl + S" FontFamily="Consolas" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
-                            </Border>
+                            <StackPanel Orientation="Vertical" Spacing="4" HorizontalAlignment="Right">
+                                <ComboBox x:Name="ComboHotkey" SelectionChanged="OnHotkeySelectionChanged" Width="240">
+                                    <ComboBoxItem Content="Ctrl + Alt + S (Default)" Tag="Ctrl+Alt+S"/>
+                                    <ComboBoxItem Content="Ctrl + Shift + F12" Tag="Ctrl+Shift+F12"/>
+                                    <ComboBoxItem Content="Win + Alt + S" Tag="Win+Alt+S"/>
+                                    <ComboBoxItem Content="Ctrl + Alt + L" Tag="Ctrl+Alt+L"/>
+                                    <ComboBoxItem Content="Ctrl + Shift + K" Tag="Ctrl+Shift+K"/>
+                                    <ComboBoxItem Content="Ctrl + Shift + S" Tag="Ctrl+Shift+S"/>
+                                    <ComboBoxItem Content="Win + Ctrl + S (Legacy)" Tag="Win+Ctrl+S"/>
+                                    <ComboBoxItem Content="None (Disabled)" Tag="None"/>
+                                </ComboBox>
+                                <TextBlock x:Name="TxtHotkeyConflictWarn" 
+                                           Text="⚠️ Hotkey in use by another app" 
+                                           Foreground="{ThemeResource SystemFillColorCautionBrush}" 
+                                           FontSize="11" 
+                                           Visibility="Collapsed" 
+                                           HorizontalAlignment="Right"/>
+                            </StackPanel>
                         </labs:SettingsCard>
                     </StackPanel>
 

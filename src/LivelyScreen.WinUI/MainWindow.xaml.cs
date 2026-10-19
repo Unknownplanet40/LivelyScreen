@@ -454,21 +454,114 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void RegisterGlobalHotkey()
+    private string? _currentHotkey;
+
+    public bool RegisterGlobalHotkey(string? hotkeyStr = null)
     {
         try
         {
             var hWnd = WindowNative.GetWindowHandle(this);
-            NativeMethods.RegisterHotKey(
+            NativeMethods.UnregisterHotKey(hWnd, 9001);
+
+            hotkeyStr ??= _settingsService.Current.Hotkey;
+            _currentHotkey = hotkeyStr;
+
+            if (string.IsNullOrWhiteSpace(hotkeyStr) || hotkeyStr.Equals("None", StringComparison.OrdinalIgnoreCase))
+            {
+                App.Log("Global hotkey disabled");
+                return true;
+            }
+
+            if (!ParseHotkey(hotkeyStr, out uint fsModifiers, out uint vk))
+            {
+                App.Log($"Global hotkey could not parse: '{hotkeyStr}'");
+                return false;
+            }
+
+            bool success = NativeMethods.RegisterHotKey(
                 hWnd,
                 9001,
-                NativeMethods.MOD_WIN | NativeMethods.MOD_CONTROL | NativeMethods.MOD_NOREPEAT,
-                0x53 // 'S' key
+                fsModifiers | NativeMethods.MOD_NOREPEAT,
+                vk
             );
+
+            if (success)
+            {
+                App.Log($"Global hotkey registered successfully: '{hotkeyStr}' (modifiers=0x{fsModifiers:X4}, vk=0x{vk:X2})");
+                return true;
+            }
+            else
+            {
+                App.Log($"Failed to register global hotkey '{hotkeyStr}'. Conflict: another app or Windows is already using it.");
+                // If legacy Win+Ctrl+S failed, auto-fallback to safe default Ctrl+Alt+S
+                if (hotkeyStr.Equals("Win+Ctrl+S", StringComparison.OrdinalIgnoreCase))
+                {
+                    App.Log("Attempting auto-fallback to Ctrl+Alt+S...");
+                    _settingsService.Current.Hotkey = "Ctrl+Alt+S";
+                    _settingsService.Save();
+                    return RegisterGlobalHotkey("Ctrl+Alt+S");
+                }
+                return false;
+            }
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"Failed to register hotkey: {ex.Message}");
+            App.Log($"Failed to register hotkey: {ex.Message}");
+            return false;
         }
+    }
+
+    public static bool ParseHotkey(string hotkeyStr, out uint fsModifiers, out uint vk)
+    {
+        fsModifiers = 0;
+        vk = 0;
+        if (string.IsNullOrWhiteSpace(hotkeyStr)) return false;
+
+        var tokens = hotkeyStr.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var rawToken in tokens)
+        {
+            var token = rawToken.ToUpperInvariant();
+            if (token is "CTRL" or "CONTROL")
+            {
+                fsModifiers |= NativeMethods.MOD_CONTROL;
+            }
+            else if (token is "ALT" or "MENU")
+            {
+                fsModifiers |= NativeMethods.MOD_ALT;
+            }
+            else if (token is "SHIFT")
+            {
+                fsModifiers |= NativeMethods.MOD_SHIFT;
+            }
+            else if (token is "WIN" or "WINDOWS")
+            {
+                fsModifiers |= NativeMethods.MOD_WIN;
+            }
+            else
+            {
+                if (token.Length == 1 && token[0] >= 'A' && token[0] <= 'Z')
+                {
+                    vk = token[0];
+                }
+                else if (token.Length == 1 && token[0] >= '0' && token[0] <= '9')
+                {
+                    vk = token[0];
+                }
+                else if (token.StartsWith('F') && int.TryParse(token[1..], out int fNum) && fNum >= 1 && fNum <= 24)
+                {
+                    vk = (uint)(0x70 + fNum - 1);
+                }
+                else if (token == "SPACE")
+                {
+                    vk = 0x20;
+                }
+                else if (Enum.TryParse<Windows.System.VirtualKey>(rawToken, true, out var parsedVk))
+                {
+                    vk = (uint)parsedVk;
+                }
+            }
+        }
+
+        return vk != 0;
     }
 }

@@ -107,7 +107,7 @@ public class AppSettings
     public int IdleDelayMinutes { get; set; } = 5;
     public bool StartWithWindows { get; set; } = true;
     public bool SmartPauseInFullscreen { get; set; } = true;
-    public string Hotkey { get; set; } = "Win+Ctrl+S";
+    public string Hotkey { get; set; } = "Ctrl+Alt+S";
 
     public HotCornerZone TriggerCorner { get; set; } = HotCornerZone.None;
     public HotCornerZone DisableCorner { get; set; } = HotCornerZone.None;
