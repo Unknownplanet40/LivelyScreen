@@ -139,7 +139,7 @@
         <Canvas x:Name="EventCapturer" Background="Transparent"
                 FocusVisualPrimaryThickness="0"
                 FocusVisualSecondaryThickness="0"
-                IsTabStop="False"
+                IsTabStop="True"
                 PointerMoved="OnPointerMoved"
                 PointerPressed="OnPointerPressed"
                 KeyDown="OnKeyDown"/>

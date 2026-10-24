@@ -153,6 +153,23 @@ public static class NativeMethods
         }
     }
 
+    public const uint SPI_GETFOREGROUNDLOCKTIMEOUT = 0x2000;
+    public const uint SPI_SETFOREGROUNDLOCKTIMEOUT = 0x2001;
+    public const int ASFW_ANY = -1;
+    public const uint LSFW_UNLOCK = 2;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool LockSetForegroundWindow(uint uCode);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref IntPtr pvParam, uint fWinIni);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, IntPtr pvParam, uint fWinIni);
+
     public static void ForceForegroundWindow(IntPtr hWnd)
     {
         if (hWnd == IntPtr.Zero) return;
@@ -162,6 +179,15 @@ public static class NativeMethods
         uint fgThread = GetWindowThreadProcessId(fgWnd, IntPtr.Zero);
         uint curThread = GetCurrentThreadId();
 
+        // Unlock foreground lock and grant rights to current process
+        AllowSetForegroundWindow(ASFW_ANY);
+        LockSetForegroundWindow(LSFW_UNLOCK);
+
+        // Temporarily bypass foreground lock timeout to prevent OS from denying focus and flashing taskbar
+        IntPtr oldTimeout = IntPtr.Zero;
+        SystemParametersInfo(SPI_GETFOREGROUNDLOCKTIMEOUT, 0, ref oldTimeout, 0);
+        SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, IntPtr.Zero, 0);
+
         bool attached = false;
         try
         {
@@ -169,6 +195,7 @@ public static class NativeMethods
             {
                 attached = AttachThreadInput(curThread, fgThread, true);
             }
+            ShowWindow(hWnd, 5); // SW_SHOW
             BringWindowToTop(hWnd);
             SetForegroundWindow(hWnd);
         }
@@ -179,6 +206,7 @@ public static class NativeMethods
             {
                 AttachThreadInput(curThread, fgThread, false);
             }
+            SystemParametersInfo(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, oldTimeout, 0);
         }
     }
 
@@ -186,25 +214,8 @@ public static class NativeMethods
     {
         if (screensaverHwnd == IntPtr.Zero) return;
 
-        // Re-assert screensaver window at top of topmost Z-order
+        // Re-assert screensaver window at top of topmost Z-order above taskbars without disturbing Explorer
         SetWindowPos(screensaverHwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-
-        // Put primary taskbar behind screensaver window
-        IntPtr primaryTray = FindWindow("Shell_TrayWnd", null);
-        if (primaryTray != IntPtr.Zero && primaryTray != screensaverHwnd)
-        {
-            SetWindowPos(primaryTray, screensaverHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        }
-
-        // Put secondary taskbars behind screensaver window
-        IntPtr secTray = IntPtr.Zero;
-        while ((secTray = FindWindowEx(IntPtr.Zero, secTray, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero)
-        {
-            if (secTray != screensaverHwnd)
-            {
-                SetWindowPos(secTray, screensaverHwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-            }
-        }
     }
 
     [DllImport("user32.dll")]

@@ -21,6 +21,7 @@ public sealed partial class MainPage : Page
     private MediaLibrary? _mediaLibrary;
     private IdleDetector? _idleDetector;
     private ScreensaverManager? _screensaverManager;
+    private UpdateService? _updateService;
     private Window? _window;
     private IntPtr _windowHandle = IntPtr.Zero;
     private bool _isInitializing = true;
@@ -46,7 +47,8 @@ public sealed partial class MainPage : Page
         SettingsService settingsService,
         MediaLibrary mediaLibrary,
         IdleDetector idleDetector,
-        ScreensaverManager screensaverManager)
+        ScreensaverManager screensaverManager,
+        UpdateService updateService)
     {
         _window = window;
         _windowHandle = WindowNative.GetWindowHandle(window);
@@ -54,6 +56,14 @@ public sealed partial class MainPage : Page
         _mediaLibrary = mediaLibrary;
         _idleDetector = idleDetector;
         _screensaverManager = screensaverManager;
+        _updateService = updateService;
+
+        _updateService.StateChanged += OnUpdateStateChanged;
+        _updateService.DownloadProgressChanged += OnUpdateDownloadProgressChanged;
+        if (TxtAppVersionPill != null)
+        {
+            TxtAppVersionPill.Text = UpdateService.CurrentVersionString;
+        }
 
         _mediaLibrary.LibraryUpdated += () =>
         {
@@ -2625,7 +2635,163 @@ public sealed partial class MainPage : Page
             if (PanelMedia != null) PanelMedia.Visibility = tag == "media" ? Visibility.Visible : Visibility.Collapsed;
             if (PanelWidgets != null) PanelWidgets.Visibility = tag == "widgets" ? Visibility.Visible : Visibility.Collapsed;
             if (PanelPower != null) PanelPower.Visibility = tag == "power" ? Visibility.Visible : Visibility.Collapsed;
+            if (PanelAbout != null) PanelAbout.Visibility = tag == "about" ? Visibility.Visible : Visibility.Collapsed;
         }
+    }
+
+    private async void OnCheckUpdatesClicked(object sender, RoutedEventArgs e)
+    {
+        if (_updateService == null) return;
+        await _updateService.CheckForUpdatesAsync(silentBackground: false);
+    }
+
+    private async void OnDownloadInstallClicked(object sender, RoutedEventArgs e)
+    {
+        if (_updateService == null) return;
+        BtnDownloadInstall.IsEnabled = false;
+        BtnCheckUpdates.IsEnabled = false;
+        await _updateService.DownloadAndInstallAsync();
+    }
+
+    private void OnUpdateStateChanged(UpdateState state, string message)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (CardUpdateStatus == null) return;
+
+            switch (state)
+            {
+                case UpdateState.Checking:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Visible;
+                        RingCheckUpdate.IsActive = true;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = false;
+                    if (BtnDownloadInstall != null) BtnDownloadInstall.Visibility = Visibility.Collapsed;
+                    CardUpdateStatus.Description = message;
+                    if (InfoBarUpdate != null) InfoBarUpdate.IsOpen = false;
+                    break;
+
+                case UpdateState.UpdateAvailable:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Collapsed;
+                        RingCheckUpdate.IsActive = false;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = true;
+                    if (BtnDownloadInstall != null)
+                    {
+                        BtnDownloadInstall.Visibility = Visibility.Visible;
+                        BtnDownloadInstall.IsEnabled = true;
+                    }
+                    CardUpdateStatus.Description = message;
+
+                    if (_updateService?.LatestRelease != null)
+                    {
+                        var rel = _updateService.LatestRelease;
+                        if (ExpanderReleaseNotes != null)
+                        {
+                            ExpanderReleaseNotes.Visibility = Visibility.Visible;
+                            ExpanderReleaseNotes.Header = $"What's new in {rel.TagName}";
+                        }
+                        if (TxtReleaseChangelog != null)
+                        {
+                            TxtReleaseChangelog.Text = string.IsNullOrWhiteSpace(rel.Changelog) ? "No release notes provided." : rel.Changelog;
+                        }
+                    }
+
+                    if (InfoBarUpdate != null)
+                    {
+                        InfoBarUpdate.Severity = InfoBarSeverity.Success;
+                        InfoBarUpdate.Title = "Update Available";
+                        InfoBarUpdate.Message = $"Version {_updateService?.LatestRelease?.TagName} is available for download.";
+                        InfoBarUpdate.IsOpen = true;
+                    }
+                    break;
+
+                case UpdateState.UpToDate:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Collapsed;
+                        RingCheckUpdate.IsActive = false;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = true;
+                    if (BtnDownloadInstall != null) BtnDownloadInstall.Visibility = Visibility.Collapsed;
+                    CardUpdateStatus.Description = message;
+                    if (ExpanderReleaseNotes != null) ExpanderReleaseNotes.Visibility = Visibility.Collapsed;
+                    if (InfoBarUpdate != null)
+                    {
+                        InfoBarUpdate.Severity = InfoBarSeverity.Informational;
+                        InfoBarUpdate.Title = "Up to Date";
+                        InfoBarUpdate.Message = message;
+                        InfoBarUpdate.IsOpen = true;
+                    }
+                    break;
+
+                case UpdateState.Downloading:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Collapsed;
+                        RingCheckUpdate.IsActive = false;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = false;
+                    if (BtnDownloadInstall != null) BtnDownloadInstall.IsEnabled = false;
+                    if (PanelDownloadProgress != null) PanelDownloadProgress.Visibility = Visibility.Visible;
+                    if (TxtDownloadStatus != null) TxtDownloadStatus.Text = message;
+                    CardUpdateStatus.Description = message;
+                    break;
+
+                case UpdateState.Downloaded:
+                    if (PanelDownloadProgress != null) PanelDownloadProgress.Visibility = Visibility.Visible;
+                    if (TxtDownloadStatus != null) TxtDownloadStatus.Text = message;
+                    CardUpdateStatus.Description = message;
+                    break;
+
+                case UpdateState.Failed:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Collapsed;
+                        RingCheckUpdate.IsActive = false;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = true;
+                    if (BtnDownloadInstall != null) BtnDownloadInstall.IsEnabled = true;
+                    if (PanelDownloadProgress != null) PanelDownloadProgress.Visibility = Visibility.Collapsed;
+                    CardUpdateStatus.Description = message;
+                    if (InfoBarUpdate != null)
+                    {
+                        InfoBarUpdate.Severity = InfoBarSeverity.Error;
+                        InfoBarUpdate.Title = "Update Error";
+                        InfoBarUpdate.Message = message;
+                        InfoBarUpdate.IsOpen = true;
+                    }
+                    break;
+
+                default:
+                    if (RingCheckUpdate != null)
+                    {
+                        RingCheckUpdate.Visibility = Visibility.Collapsed;
+                        RingCheckUpdate.IsActive = false;
+                    }
+                    if (BtnCheckUpdates != null) BtnCheckUpdates.IsEnabled = true;
+                    break;
+            }
+        });
+    }
+
+    private void OnUpdateDownloadProgressChanged(double progress)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (BarDownloadProgress != null)
+            {
+                BarDownloadProgress.Value = Math.Clamp(progress * 100, 0, 100);
+            }
+            if (TxtDownloadPercent != null)
+            {
+                TxtDownloadPercent.Text = $"{progress:P0}";
+            }
+        });
     }
 
     private void NavView_PaneOpened(NavigationView sender, object args)

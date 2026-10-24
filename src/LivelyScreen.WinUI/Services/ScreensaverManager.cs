@@ -38,8 +38,12 @@ public class ScreensaverManager
     public void StartScreensaver()
     {
         LivelyScreen_WinUI.App.Log("StartScreensaver called");
+        NativeMethods.AllowSetForegroundWindow(Environment.ProcessId);
+        NativeMethods.LockSetForegroundWindow(NativeMethods.LSFW_UNLOCK);
         _dispatcherQueue.TryEnqueue(() =>
         {
+            NativeMethods.AllowSetForegroundWindow(Environment.ProcessId);
+            NativeMethods.LockSetForegroundWindow(NativeMethods.LSFW_UNLOCK);
             lock (_lock)
             {
                 if (IsActive)

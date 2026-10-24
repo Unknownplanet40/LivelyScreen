@@ -29,6 +29,7 @@ public sealed partial class ScreensaverWindow : Window
     private bool _activeLayerIsA = true;
     private DateTime _activationTime = DateTime.MaxValue;
     private readonly DispatcherTimer _photoTimer;
+    private readonly DispatcherTimer _videoWatchdogTimer;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _clockShuffleTimer;
     private readonly DispatcherTimer _oledShiftTimer;
@@ -43,6 +44,7 @@ public sealed partial class ScreensaverWindow : Window
     private Stream? _activeStreamB;
 
     private Storyboard? _currentTransition;
+    private Action? _pendingTransitionComplete;
     private Storyboard? _kenBurnsStoryboardA;
     private Storyboard? _kenBurnsStoryboardB;
     private NativeMethods.SubclassProc? _borderlessSubclassProc;
@@ -78,6 +80,14 @@ public sealed partial class ScreensaverWindow : Window
 
         _photoTimer = new DispatcherTimer();
         _photoTimer.Tick += (_, _) => AdvanceToNextMedia();
+
+        _videoWatchdogTimer = new DispatcherTimer();
+        _videoWatchdogTimer.Tick += (_, _) =>
+        {
+            _videoWatchdogTimer.Stop();
+            App.Log("Video watchdog triggered timeout: advancing to next media");
+            AdvanceToNextMedia();
+        };
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
         _clockTimer.Tick += (_, _) => UpdateClockWidget();
@@ -223,6 +233,7 @@ public sealed partial class ScreensaverWindow : Window
                 if (IsMaster || _isPrimary)
                 {
                     NativeMethods.ForceForegroundWindow(hWnd);
+                    EventCapturer?.Focus(FocusState.Programmatic);
                 }
 
                 NativeMethods.SuppressTaskbars(hWnd);
@@ -344,18 +355,38 @@ public sealed partial class ScreensaverWindow : Window
         var profile = _settingsService.Current.GetProfileForPath(item.FilePath);
 
         if (CurrentMediaItem != null &&
-            item.Type == MediaType.Image &&
             string.Equals(CurrentMediaItem.FilePath, item.FilePath, StringComparison.OrdinalIgnoreCase))
         {
-            if (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone)
+            if (item.Type == MediaType.Image)
             {
-                _photoTimer.Interval = TimeSpan.FromSeconds(Math.Max(2, profile.PhotoDisplaySeconds));
-                _photoTimer.Start();
+                if (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone)
+                {
+                    _photoTimer.Interval = TimeSpan.FromSeconds(Math.Max(2, profile.PhotoDisplaySeconds));
+                    _photoTimer.Start();
+                }
+                return;
             }
-            return;
+            else if (item.Type == MediaType.Video)
+            {
+                var curVid = _activeLayerIsA ? VideoA : VideoB;
+                if (curVid.MediaPlayer != null)
+                {
+                    try
+                    {
+                        curVid.MediaPlayer.PlaybackSession.Position = TimeSpan.Zero;
+                        curVid.MediaPlayer.Play();
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        App.Log($"Error rewinding video: {ex.Message}");
+                    }
+                }
+            }
         }
 
         _photoTimer.Stop();
+        _videoWatchdogTimer.Stop();
         CurrentMediaItem = item;
         NoMediaPrompt.Visibility = Visibility.Collapsed;
         App.Log($"DisplayMedia on {(_bounds.X == 0 && _bounds.Y == 0 ? "primary" : "secondary")}: {item.FileName} (initial={initial}, isMaster={IsMaster})");
@@ -446,20 +477,44 @@ public sealed partial class ScreensaverWindow : Window
             vidCtrl.Visibility = Visibility.Visible;
             try
             {
-                var fs = File.OpenRead(item.FilePath);
-                if (isLayerA)
+                if (!File.Exists(item.FilePath))
                 {
-                    _activeStreamA?.Dispose();
-                    _activeStreamA = fs;
-                }
-                else
-                {
-                    _activeStreamB?.Dispose();
-                    _activeStreamB = fs;
+                    App.Log($"Video file not found: {item.FilePath}");
+                    if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                    {
+                        AdvanceToNextMedia();
+                    }
+                    return;
                 }
 
-                var ras = fs.AsRandomAccessStream();
-                var mediaSource = MediaSource.CreateFromStream(ras, "video/mp4");
+                // Cleanly dispose existing player on this element first to avoid hardware decoder exhaustion
+                var oldPlayer = vidCtrl.MediaPlayer;
+                vidCtrl.SetMediaPlayer(null);
+                try { oldPlayer?.Dispose(); } catch { }
+
+                MediaSource mediaSource;
+                try
+                {
+                    mediaSource = MediaSource.CreateFromUri(new Uri(item.FilePath));
+                }
+                catch
+                {
+                    var fs = File.OpenRead(item.FilePath);
+                    if (isLayerA)
+                    {
+                        _activeStreamA?.Dispose();
+                        _activeStreamA = fs;
+                    }
+                    else
+                    {
+                        _activeStreamB?.Dispose();
+                        _activeStreamB = fs;
+                    }
+
+                    var ras = fs.AsRandomAccessStream();
+                    mediaSource = MediaSource.CreateFromStream(ras, GetVideoMimeType(item.FilePath));
+                }
+
                 bool shouldMute = !IsMaster || !settings.VideoAudioEnabled;
                 var player = new MediaPlayer
                 {
@@ -467,13 +522,36 @@ public sealed partial class ScreensaverWindow : Window
                     IsMuted = shouldMute,
                     Volume = shouldMute ? 0 : settings.VideoVolumePercent / 100.0
                 };
+
                 if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
                 {
                     player.MediaEnded += (_, _) =>
                     {
                         DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
                     };
+                    player.MediaFailed += (_, args) =>
+                    {
+                        App.Log($"MediaPlayer failed on {item.FileName}: {args.Error} ({args.ErrorMessage})");
+                        DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
+                    };
+                    player.MediaOpened += (sender, _) =>
+                    {
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            var dur = sender.NaturalDuration;
+                            if (dur > TimeSpan.Zero && dur < TimeSpan.FromHours(6))
+                            {
+                                _videoWatchdogTimer.Interval = dur + TimeSpan.FromSeconds(3);
+                            }
+                            else
+                            {
+                                _videoWatchdogTimer.Interval = TimeSpan.FromMinutes(10);
+                            }
+                            _videoWatchdogTimer.Start();
+                        });
+                    };
                 }
+
                 vidCtrl.SetMediaPlayer(player);
                 player.Play();
             }
@@ -488,12 +566,24 @@ public sealed partial class ScreensaverWindow : Window
         }
         else
         {
-            vidCtrl.Visibility = Visibility.Collapsed;
+            var oldPlayer = vidCtrl.MediaPlayer;
             vidCtrl.SetMediaPlayer(null);
+            try { oldPlayer?.Dispose(); } catch { }
+            vidCtrl.Visibility = Visibility.Collapsed;
 
             imgCtrl.Visibility = Visibility.Visible;
             try
             {
+                if (!File.Exists(item.FilePath))
+                {
+                    App.Log($"Image file not found: {item.FilePath}");
+                    if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                    {
+                        AdvanceToNextMedia();
+                    }
+                    return;
+                }
+
                 using var fs = new FileStream(item.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
                 var ras = fs.AsRandomAccessStream();
 
@@ -509,6 +599,11 @@ public sealed partial class ScreensaverWindow : Window
             catch (Exception ex)
             {
                 App.Log($"Error loading image {item.FileName}: {ex.Message}");
+                if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                {
+                    AdvanceToNextMedia();
+                    return;
+                }
             }
 
             if (profile.KenBurnsEffect)
@@ -573,7 +668,16 @@ public sealed partial class ScreensaverWindow : Window
         SourceProfile profile,
         Action onComplete)
     {
-        _currentTransition?.Stop();
+        if (_currentTransition != null)
+        {
+            _currentTransition.Stop();
+            _currentTransition = null;
+            var prevAction = _pendingTransitionComplete;
+            _pendingTransitionComplete = null;
+            prevAction?.Invoke();
+        }
+
+        _pendingTransitionComplete = onComplete;
         var style = profile.TransitionStyle;
         var durationSec = Math.Max(0.2, profile.TransitionDurationSeconds);
 
@@ -581,6 +685,7 @@ public sealed partial class ScreensaverWindow : Window
         {
             toLayer.Opacity = 1;
             fromLayer.Opacity = 0;
+            _pendingTransitionComplete = null;
             onComplete();
             return;
         }
@@ -618,7 +723,9 @@ public sealed partial class ScreensaverWindow : Window
                 fromLayer.Opacity = 0;
                 toLayer.Opacity = 1;
                 _currentTransition = null;
-                onComplete();
+                var act = _pendingTransitionComplete;
+                _pendingTransitionComplete = null;
+                act?.Invoke();
             };
 
             _currentTransition = sb;
@@ -663,7 +770,9 @@ public sealed partial class ScreensaverWindow : Window
                 {
                     toLayer.Opacity = 1;
                     _currentTransition = null;
-                    onComplete();
+                    var act = _pendingTransitionComplete;
+                    _pendingTransitionComplete = null;
+                    act?.Invoke();
                 };
 
                 _currentTransition = sbIn;
@@ -717,7 +826,9 @@ public sealed partial class ScreensaverWindow : Window
                 fromTransform.X = 0;
                 toTransform.X = 0;
                 _currentTransition = null;
-                onComplete();
+                var act = _pendingTransitionComplete;
+                _pendingTransitionComplete = null;
+                act?.Invoke();
             };
 
             _currentTransition = sb;
@@ -730,7 +841,13 @@ public sealed partial class ScreensaverWindow : Window
         Microsoft.UI.Xaml.Controls.MediaPlayerElement vidCtrl,
         bool isLayerA)
     {
+        var oldPlayer = vidCtrl.MediaPlayer;
         vidCtrl.SetMediaPlayer(null);
+        try
+        {
+            oldPlayer?.Dispose();
+        }
+        catch { }
         vidCtrl.Visibility = Visibility.Collapsed;
 
         imgCtrl.Source = null;
@@ -760,6 +877,21 @@ public sealed partial class ScreensaverWindow : Window
             _activeStreamB?.Dispose();
             _activeStreamB = null;
         }
+    }
+
+    private static string GetVideoMimeType(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".mp4" or ".m4v" => "video/mp4",
+            ".mkv" => "video/x-matroska",
+            ".webm" => "video/webm",
+            ".mov" => "video/quicktime",
+            ".wmv" => "video/x-ms-wmv",
+            ".avi" => "video/x-msvideo",
+            _ => "video/mp4"
+        };
     }
 
     private void OnPointerMoved(object sender, PointerRoutedEventArgs e)
@@ -824,6 +956,7 @@ public sealed partial class ScreensaverWindow : Window
         }
 
         _photoTimer.Stop();
+        _videoWatchdogTimer.Stop();
         _clockTimer.Stop();
         _clockShuffleTimer.Stop();
         _oledShiftTimer.Stop();
@@ -1377,6 +1510,7 @@ public sealed partial class ScreensaverWindow : Window
         }
 
         _photoTimer.Stop();
+        _videoWatchdogTimer.Stop();
         _clockTimer.Stop();
         _clockShuffleTimer.Stop();
         _oledShiftTimer.Stop();

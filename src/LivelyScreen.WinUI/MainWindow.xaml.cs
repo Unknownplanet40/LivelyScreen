@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
     private readonly MediaLibrary _mediaLibrary;
     private readonly IdleDetector _idleDetector;
     private readonly ScreensaverManager _screensaverManager;
+    private readonly UpdateService _updateService;
 
     private NativeMethods.NOTIFYICONDATA _nid;
     private NativeMethods.SubclassProc? _subclassProc;
@@ -41,6 +42,7 @@ public sealed partial class MainWindow : Window
         _mediaLibrary = new MediaLibrary(_settingsService);
         _idleDetector = new IdleDetector(_settingsService);
         _screensaverManager = new ScreensaverManager(_settingsService, _mediaLibrary, _idleDetector, DispatcherQueue);
+        _updateService = new UpdateService(DispatcherQueue);
         App.Log("MainWindow services initialized");
 
         // Initialize Native Windows 11 AppWindow properties
@@ -122,14 +124,21 @@ public sealed partial class MainWindow : Window
         App.Log("MainWindow RegisterGlobalHotkey done");
 
         // Initialize hosted MainPage with services and window
-        MainView.InitializeServices(this, _settingsService, _mediaLibrary, _idleDetector, _screensaverManager);
+        MainView.InitializeServices(this, _settingsService, _mediaLibrary, _idleDetector, _screensaverManager, _updateService);
         MainView.ThemePreferenceChanged += ApplyThemePreference;
-        MainView.ScreensaverRequested += () => _screensaverManager.StartScreensaver();
+        MainView.ScreensaverRequested += () =>
+        {
+            NativeMethods.AllowSetForegroundWindow(Environment.ProcessId);
+            NativeMethods.LockSetForegroundWindow(NativeMethods.LSFW_UNLOCK);
+            _screensaverManager.StartScreensaver();
+        };
 
         ApplyThemePreference();
 
         _idleDetector.Start();
         App.Log("MainWindow _idleDetector started");
+        _updateService.StartBackgroundMonitoring();
+        App.Log("MainWindow _updateService monitoring started");
     }
 
     private void SetupTrayIcon()
@@ -214,6 +223,8 @@ public sealed partial class MainWindow : Window
         {
             if ((int)wParam == 9001)
             {
+                NativeMethods.AllowSetForegroundWindow(Environment.ProcessId);
+                NativeMethods.LockSetForegroundWindow(NativeMethods.LSFW_UNLOCK);
                 _screensaverManager.StartScreensaver();
                 return IntPtr.Zero;
             }

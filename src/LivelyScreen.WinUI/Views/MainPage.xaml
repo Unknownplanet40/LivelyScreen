@@ -59,6 +59,12 @@
                         <FontIcon Glyph="&#xE7E8;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+
+                <NavigationViewItem Content="About &amp; Updates" Tag="about">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE897;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.PaneFooter>
@@ -1984,6 +1990,95 @@
                                 </StackPanel>
                             </Grid>
                         </Border>
+                    </StackPanel>
+
+                    <!-- TAB 5: ABOUT & UPDATES -->
+                    <StackPanel x:Name="PanelAbout" Visibility="Collapsed" Spacing="16">
+                        <!-- App Identity Header -->
+                        <Grid Margin="0,4,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Border Width="64" Height="64" CornerRadius="16" Background="#1AFFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" Margin="0,0,18,0">
+                                <Image Source="ms-appx:///Assets/LogoMark-cropped.png" Width="48" Height="48" Stretch="Uniform" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <TextBlock Text="LivelyScreen" Style="{StaticResource TitleTextBlockStyle}" FontWeight="Bold" FontSize="24" />
+                                    <Border Background="#250078D4" BorderBrush="#500078D4" BorderThickness="1" CornerRadius="6" Padding="6,2,6,2" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TxtAppVersionPill" Text="v1.0.4" FontSize="11" FontWeight="SemiBold" Foreground="#60CDFF" />
+                                    </Border>
+                                    <Border Background="#15FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="6" Padding="6,2,6,2" VerticalAlignment="Center">
+                                        <TextBlock Text="Stable" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </Border>
+                                </StackPanel>
+                                <TextBlock Text="Native Windows 11 video &amp; photo screensaver daemon built with WinUI 3." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Updates Card -->
+                        <TextBlock Text="Updates" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,8,0,0"/>
+                        <labs:SettingsCard x:Name="CardUpdateStatus" Header="Software Updates" Description="Check GitHub Releases for latest features and bug fixes.">
+                            <labs:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE895;" />
+                            </labs:SettingsCard.HeaderIcon>
+                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                <ProgressRing x:Name="RingCheckUpdate" IsActive="False" Visibility="Collapsed" Width="20" Height="20" />
+                                <Button x:Name="BtnCheckUpdates" Content="Check for Updates" Click="OnCheckUpdatesClicked" Style="{StaticResource AccentButtonStyle}" />
+                                <Button x:Name="BtnDownloadInstall" Content="Download &amp; Install" Click="OnDownloadInstallClicked" Visibility="Collapsed" Style="{StaticResource AccentButtonStyle}" />
+                            </StackPanel>
+                        </labs:SettingsCard>
+
+                        <!-- Download Progress Bar & Status Text -->
+                        <StackPanel x:Name="PanelDownloadProgress" Visibility="Collapsed" Spacing="6" Margin="0,4,0,0">
+                            <Grid>
+                                <TextBlock x:Name="TxtDownloadStatus" Text="Downloading update..." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="TxtDownloadPercent" Text="0%" FontSize="12" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                            </Grid>
+                            <ProgressBar x:Name="BarDownloadProgress" Minimum="0" Maximum="100" Value="0" Height="6" CornerRadius="3" />
+                        </StackPanel>
+
+                        <!-- Status Notification InfoBar -->
+                        <InfoBar x:Name="InfoBarUpdate" IsOpen="False" IsClosable="True" Severity="Informational" Margin="0,4,0,0" />
+
+                        <!-- Release Notes Expander -->
+                        <labs:SettingsExpander x:Name="ExpanderReleaseNotes" Header="Release Notes" Description="View what's new in the latest version." IsExpanded="True" Visibility="Collapsed">
+                            <labs:SettingsExpander.HeaderIcon>
+                                <FontIcon Glyph="&#xE8A5;" />
+                            </labs:SettingsExpander.HeaderIcon>
+                            <labs:SettingsExpander.Items>
+                                <labs:SettingsCard HorizontalContentAlignment="Stretch">
+                                    <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                                        <TextBlock x:Name="TxtReleaseChangelog" Text="" TextWrapping="Wrap" FontFamily="Consolas, Segoe UI" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </ScrollViewer>
+                                </labs:SettingsCard>
+                            </labs:SettingsExpander.Items>
+                        </labs:SettingsExpander>
+
+                        <!-- App & Community Links Section -->
+                        <TextBlock Text="About &amp; Project" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,0"/>
+
+                        <labs:SettingsCard Header="GitHub Repository" Description="Contribute, star the project, or explore source code.">
+                            <labs:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE71B;" />
+                            </labs:SettingsCard.HeaderIcon>
+                            <HyperlinkButton Content="Unknownplanet40/LivelyScreen" NavigateUri="https://github.com/Unknownplanet40/LivelyScreen" />
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="Report an Issue" Description="Encountered a bug or want to request a screensaver feature?">
+                            <labs:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE939;" />
+                            </labs:SettingsCard.HeaderIcon>
+                            <HyperlinkButton Content="Open GitHub Issues" NavigateUri="https://github.com/Unknownplanet40/LivelyScreen/issues" />
+                        </labs:SettingsCard>
+
+                        <labs:SettingsCard Header="License" Description="Released under the permissive MIT Open Source License.">
+                            <labs:SettingsCard.HeaderIcon>
+                                <FontIcon Glyph="&#xE8A5;" />
+                            </labs:SettingsCard.HeaderIcon>
+                            <TextBlock Text="MIT License" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </labs:SettingsCard>
                     </StackPanel>
 
                 </StackPanel>
