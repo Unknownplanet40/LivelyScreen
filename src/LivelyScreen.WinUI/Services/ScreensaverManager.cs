@@ -123,7 +123,7 @@ public class ScreensaverManager
                                 {
                                     foreach (var other in _activeWindows)
                                     {
-                                        if (other != win)
+                                        if (other != win && !other.IsBlackout)
                                         {
                                             other.DisplayMedia(item, initial);
                                         }
@@ -143,7 +143,7 @@ public class ScreensaverManager
                         {
                             foreach (var win in _activeWindows)
                             {
-                                if (win != masterWin)
+                                if (win != masterWin && !win.IsBlackout)
                                 {
                                     win.DisplayMedia(masterWin.CurrentMediaItem, initial: true);
                                 }
@@ -180,6 +180,10 @@ public class ScreensaverManager
                     return;
 
                 var windowsToClose = _activeWindows.ToList();
+                _activeWindows.Clear();
+                _idleDetector.IsScreensaverActive = false;
+                NativeMethods.SetThreadExecutionState(NativeMethods.EXECUTION_STATE.ES_CONTINUOUS);
+
                 int remaining = windowsToClose.Count;
 
                 Action checkAllClosed = () =>
@@ -189,13 +193,8 @@ public class ScreensaverManager
                         lock (_lock)
                         {
                             remaining--;
-                            if (remaining <= 0 && _activeWindows.Count > 0)
+                            if (remaining <= 0)
                             {
-                                _activeWindows.Clear();
-                                _idleDetector.IsScreensaverActive = false;
-
-                                NativeMethods.SetThreadExecutionState(NativeMethods.EXECUTION_STATE.ES_CONTINUOUS);
-
                                 ScreensaverStopped?.Invoke();
                                 LivelyScreen_WinUI.App.Log("Screensaver fully stopped with synchronized fade out");
                             }

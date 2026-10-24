@@ -67,6 +67,9 @@ public class MediaLibrary
                 return match;
             }
 
+            if (string.Equals(activeSource, "ALL", StringComparison.OrdinalIgnoreCase))
+                return null;
+
             var selectedId = _settingsService.Current.SelectedThemeId;
             if (string.Equals(selectedId, "NONE", StringComparison.OrdinalIgnoreCase))
                 return null;
@@ -78,7 +81,7 @@ public class MediaLibrary
                     return match;
             }
 
-            return _themes[0];
+            return null;
         }
     }
 
@@ -394,6 +397,10 @@ public class MediaLibrary
                     _sourceSequenceIndices[sourceKey] = (curIdx + 1) % activeTheme.OrderedCycleItems.Count;
                     return activeTheme.OrderedCycleItems[idx];
                 }
+
+                // If active dynamic theme is set, never fall through to standard items from other sources!
+                if (activeTheme.OrderedCycleItems.Count > 0)
+                    return activeTheme.OrderedCycleItems[0];
             }
 
             var candidateItems = _items;

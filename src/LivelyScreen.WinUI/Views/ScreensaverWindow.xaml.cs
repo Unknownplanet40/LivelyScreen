@@ -51,6 +51,7 @@ public sealed partial class ScreensaverWindow : Window
 
     public bool IsMaster { get; }
     public int DisplayIndex { get; }
+    public bool IsBlackout => _isBlackout;
     public string? AssignedSourcePath { get; }
     public MediaItem? CurrentMediaItem { get; private set; }
     public event Action? DismissRequested;
@@ -79,18 +80,35 @@ public sealed partial class ScreensaverWindow : Window
         AssignedSourcePath = assignedSourcePath;
 
         _photoTimer = new DispatcherTimer();
-        _photoTimer.Tick += (_, _) => AdvanceToNextMedia();
+        _photoTimer.Tick += (_, _) =>
+        {
+            if (_isClosing || _isBlackout)
+            {
+                _photoTimer.Stop();
+                return;
+            }
+            AdvanceToNextMedia();
+        };
 
         _videoWatchdogTimer = new DispatcherTimer();
         _videoWatchdogTimer.Tick += (_, _) =>
         {
             _videoWatchdogTimer.Stop();
+            if (_isClosing || _isBlackout) return;
             App.Log("Video watchdog triggered timeout: advancing to next media");
             AdvanceToNextMedia();
         };
 
         _clockTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
-        _clockTimer.Tick += (_, _) => UpdateClockWidget();
+        _clockTimer.Tick += (_, _) =>
+        {
+            if (_isClosing)
+            {
+                _clockTimer.Stop();
+                return;
+            }
+            UpdateClockWidget();
+        };
 
         _clockShuffleTimer = new DispatcherTimer();
         _clockShuffleTimer.Tick += OnClockShuffleTick;
@@ -137,6 +155,25 @@ public sealed partial class ScreensaverWindow : Window
         {
             App.Log($"ScreensaverWindow ctor presenter init error: {ex.Message}");
         }
+
+        Closed += (_, _) =>
+        {
+            _isClosing = true;
+            DismissRequested = null;
+            MediaBroadcastRequested = null;
+            _photoTimer.Stop();
+            _videoWatchdogTimer.Stop();
+            _clockTimer.Stop();
+            _clockShuffleTimer.Stop();
+            _oledShiftTimer.Stop();
+            _blackoutStageTimer.Stop();
+            _taskbarWatchdogTimer.Stop();
+            _kenBurnsStoryboardA?.Stop();
+            _kenBurnsStoryboardB?.Stop();
+            _currentTransition?.Stop();
+            UnloadLayer(ImageA, VideoA, isLayerA: true);
+            UnloadLayer(ImageB, VideoB, isLayerA: false);
+        };
 
         Activated += OnWindowActivated;
     }
@@ -352,6 +389,8 @@ public sealed partial class ScreensaverWindow : Window
 
     public void DisplayMedia(MediaItem item, bool initial = false)
     {
+        if (_isClosing || _isBlackout) return;
+
         var profile = _settingsService.Current.GetProfileForPath(item.FilePath);
 
         if (CurrentMediaItem != null &&
@@ -429,12 +468,16 @@ public sealed partial class ScreensaverWindow : Window
 
     public void AdvanceToNextMedia(bool initial = false)
     {
+        if (_isClosing || _isBlackout) return;
+
         if (!IsMaster && _settingsService.Current.DisplayMode == MonitorMode.Clone)
         {
             return;
         }
 
         var item = _mediaLibrary.GetNextItem(_settingsService.Current.Order, AssignedSourcePath);
+        if (_isClosing || _isBlackout) return;
+
         if (item == null)
         {
             NoMediaPrompt.Visibility = Visibility.Visible;
@@ -456,6 +499,8 @@ public sealed partial class ScreensaverWindow : Window
         MediaItem item,
         bool isLayerA)
     {
+        if (_isClosing || _isBlackout) return;
+
         var settings = _settingsService.Current;
         var profile = settings.GetProfileForPath(item.FilePath);
         var fitMode = profile.FitMode;
@@ -480,7 +525,7 @@ public sealed partial class ScreensaverWindow : Window
                 if (!File.Exists(item.FilePath))
                 {
                     App.Log($"Video file not found: {item.FilePath}");
-                    if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                    if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
                     {
                         AdvanceToNextMedia();
                     }
@@ -527,17 +572,27 @@ public sealed partial class ScreensaverWindow : Window
                 {
                     player.MediaEnded += (_, _) =>
                     {
-                        DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
+                        if (_isClosing || _isBlackout) return;
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (!_isClosing && !_isBlackout) AdvanceToNextMedia();
+                        });
                     };
                     player.MediaFailed += (_, args) =>
                     {
+                        if (_isClosing || _isBlackout) return;
                         App.Log($"MediaPlayer failed on {item.FileName}: {args.Error} ({args.ErrorMessage})");
-                        DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (!_isClosing && !_isBlackout) AdvanceToNextMedia();
+                        });
                     };
                     player.MediaOpened += (sender, _) =>
                     {
+                        if (_isClosing || _isBlackout) return;
                         DispatcherQueue.TryEnqueue(() =>
                         {
+                            if (_isClosing || _isBlackout) return;
                             var dur = sender.NaturalDuration;
                             if (dur > TimeSpan.Zero && dur < TimeSpan.FromHours(6))
                             {
@@ -558,7 +613,7 @@ public sealed partial class ScreensaverWindow : Window
             catch (Exception ex)
             {
                 App.Log($"Error loading video {item.FileName}: {ex.Message}");
-                if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
                 {
                     AdvanceToNextMedia();
                 }
@@ -577,7 +632,7 @@ public sealed partial class ScreensaverWindow : Window
                 if (!File.Exists(item.FilePath))
                 {
                     App.Log($"Image file not found: {item.FilePath}");
-                    if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                    if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
                     {
                         AdvanceToNextMedia();
                     }
@@ -594,17 +649,20 @@ public sealed partial class ScreensaverWindow : Window
                     DecodePixelType = DecodePixelType.Physical
                 };
                 await bitmap.SetSourceAsync(ras);
+                if (_isClosing || _isBlackout) return;
                 imgCtrl.Source = bitmap;
             }
             catch (Exception ex)
             {
                 App.Log($"Error loading image {item.FileName}: {ex.Message}");
-                if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+                if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
                 {
                     AdvanceToNextMedia();
                     return;
                 }
             }
+
+            if (_isClosing || _isBlackout) return;
 
             if (profile.KenBurnsEffect)
             {
@@ -654,6 +712,8 @@ public sealed partial class ScreensaverWindow : Window
                 kbSb.Begin();
             }
 
+            if (_isClosing || _isBlackout) return;
+
             if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
             {
                 _photoTimer.Interval = TimeSpan.FromSeconds(Math.Max(2.0, profile.PhotoDisplaySeconds));
@@ -668,6 +728,8 @@ public sealed partial class ScreensaverWindow : Window
         SourceProfile profile,
         Action onComplete)
     {
+        if (_isClosing || _isBlackout) return;
+
         if (_currentTransition != null)
         {
             _currentTransition.Stop();
@@ -950,6 +1012,9 @@ public sealed partial class ScreensaverWindow : Window
         if (_isClosing) return;
         _isClosing = true;
 
+        DismissRequested = null;
+        MediaBroadcastRequested = null;
+
         if (IsMaster)
         {
             AmbientAudioService.Stop();
@@ -962,6 +1027,10 @@ public sealed partial class ScreensaverWindow : Window
         _oledShiftTimer.Stop();
         _blackoutStageTimer.Stop();
         _taskbarWatchdogTimer.Stop();
+
+        _kenBurnsStoryboardA?.Stop();
+        _kenBurnsStoryboardB?.Stop();
+        _currentTransition?.Stop();
 
         var hWnd = WindowNative.GetWindowHandle(this);
         if (hWnd != IntPtr.Zero)
