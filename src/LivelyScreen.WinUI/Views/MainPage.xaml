@@ -2007,7 +2007,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                     <TextBlock Text="LivelyScreen" Style="{StaticResource TitleTextBlockStyle}" FontWeight="Bold" FontSize="24" />
                                     <Border Background="#250078D4" BorderBrush="#500078D4" BorderThickness="1" CornerRadius="6" Padding="6,2,6,2" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TxtAppVersionPill" Text="v1.0.5" FontSize="11" FontWeight="SemiBold" Foreground="#60CDFF" />
+                                        <TextBlock x:Name="TxtAppVersionPill" Text="v1.0.6" FontSize="11" FontWeight="SemiBold" Foreground="#60CDFF" />
                                     </Border>
                                     <Border Background="#15FFFFFF" BorderBrush="#25FFFFFF" BorderThickness="1" CornerRadius="6" Padding="6,2,6,2" VerticalAlignment="Center">
                                         <TextBlock Text="Stable" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

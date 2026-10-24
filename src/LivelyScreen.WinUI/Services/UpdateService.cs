@@ -239,26 +239,31 @@ public class UpdateService
                 try { File.Delete(installerPath); } catch { }
             }
 
-            using var response = await _httpClient.GetAsync(LatestRelease.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = response.Content.Headers.ContentLength ?? LatestRelease.DownloadSize;
-            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var fs = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, useAsync: true);
-
-            var buffer = new byte[81920];
-            long totalRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+            using (var response = await _httpClient.GetAsync(LatestRelease.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
             {
-                await fs.WriteAsync(buffer, 0, bytesRead, cancellationToken);
-                totalRead += bytesRead;
-                if (totalBytes > 0)
+                response.EnsureSuccessStatusCode();
+
+                var totalBytes = response.Content.Headers.ContentLength ?? LatestRelease.DownloadSize;
+                using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+                using (var fs = new FileStream(installerPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, useAsync: true))
                 {
-                    var progress = (double)totalRead / totalBytes;
-                    DownloadProgress = progress;
-                    _dispatcherQueue.TryEnqueue(() => DownloadProgressChanged?.Invoke(progress));
+                    var buffer = new byte[81920];
+                    long totalRead = 0;
+                    int bytesRead;
+
+                    while ((bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken)) > 0)
+                    {
+                        await fs.WriteAsync(buffer, 0, bytesRead, cancellationToken);
+                        totalRead += bytesRead;
+                        if (totalBytes > 0)
+                        {
+                            var progress = (double)totalRead / totalBytes;
+                            DownloadProgress = progress;
+                            _dispatcherQueue.TryEnqueue(() => DownloadProgressChanged?.Invoke(progress));
+                        }
+                    }
+
+                    await fs.FlushAsync(cancellationToken);
                 }
             }
 
@@ -292,23 +297,32 @@ public class UpdateService
 
         try
         {
-            LivelyScreen_WinUI.App.Log($"[UpdateService] Launching silent installer: {installerPath}");
+            var appExePath = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName;
+            LivelyScreen_WinUI.App.Log($"[UpdateService] Launching installer handoff: {installerPath}, restart app: {appExePath}");
+
+            // cmd.exe ping delay allows LivelyScreen to terminate and release file locks
+            var arguments = string.IsNullOrEmpty(appExePath)
+                ? $"/c ping 127.0.0.1 -n 3 > nul & \"{installerPath}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+                : $"/c ping 127.0.0.1 -n 3 > nul & \"{installerPath}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART & start \"\" \"{appExePath}\"";
 
             var psi = new ProcessStartInfo
             {
-                FileName = installerPath,
-                Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
-                UseShellExecute = true
+                FileName = "cmd.exe",
+                Arguments = arguments,
+                CreateNoWindow = true,
+                UseShellExecute = false
             };
 
             Process.Start(psi);
+            LivelyScreen_WinUI.App.Log("[UpdateService] Handoff script started. Terminating current instance.");
 
             // Cleanly exit current instance so the installer can replace files without file locks
             Environment.Exit(0);
         }
         catch (Exception ex)
         {
-            LivelyScreen_WinUI.App.Log($"[UpdateService] Error launching installer: {ex.Message}");
+            LivelyScreen_WinUI.App.Log($"[UpdateService] Error launching installer handoff: {ex.Message}");
+            throw;
         }
     }
 
