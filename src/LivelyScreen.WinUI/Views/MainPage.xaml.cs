@@ -724,6 +724,27 @@ public sealed partial class MainPage : Page
         ToggleDialogKenBurns.IsOn = profile.KenBurnsEffect;
         ComboDialogFitMode.SelectedIndex = (int)profile.FitMode;
 
+        bool isAll = string.Equals(path, "ALL", StringComparison.OrdinalIgnoreCase);
+        if (ComboItemOrderInherit != null)
+        {
+            ComboItemOrderInherit.Visibility = isAll ? Visibility.Collapsed : Visibility.Visible;
+            ComboItemOrderInherit.IsEnabled = !isAll;
+        }
+
+        if (ComboDialogPlaybackOrder != null)
+        {
+            if (isAll)
+            {
+                ComboDialogPlaybackOrder.SelectedIndex = (int)_settingsService.Current.Order + 1;
+            }
+            else
+            {
+                ComboDialogPlaybackOrder.SelectedIndex = profile.Order.HasValue
+                    ? (int)profile.Order.Value + 1
+                    : 0;
+            }
+        }
+
         DialogSourceEffects.XamlRoot = this.Content.XamlRoot;
         await DialogSourceEffects.ShowAsync();
     }
@@ -744,6 +765,12 @@ public sealed partial class MainPage : Page
     {
         if (_settingsService == null || string.IsNullOrEmpty(_editingSourcePath)) return;
 
+        PlaybackOrder? chosenOrder = null;
+        if (ComboDialogPlaybackOrder != null && ComboDialogPlaybackOrder.SelectedIndex > 0)
+        {
+            chosenOrder = (PlaybackOrder)(ComboDialogPlaybackOrder.SelectedIndex - 1);
+        }
+
         var profile = new SourceProfile
         {
             TransitionStyle = ComboDialogTransitionStyle.SelectedIndex >= 0
@@ -754,7 +781,8 @@ public sealed partial class MainPage : Page
             KenBurnsEffect = ToggleDialogKenBurns.IsOn,
             FitMode = ComboDialogFitMode.SelectedIndex >= 0
                 ? (MediaFitMode)ComboDialogFitMode.SelectedIndex
-                : MediaFitMode.Fill
+                : MediaFitMode.Fill,
+            Order = chosenOrder
         };
 
         if (string.Equals(_editingSourcePath, "ALL", StringComparison.OrdinalIgnoreCase))
@@ -764,12 +792,21 @@ public sealed partial class MainPage : Page
             _settingsService.Current.PhotoDisplaySeconds = profile.PhotoDisplaySeconds;
             _settingsService.Current.KenBurnsEffect = profile.KenBurnsEffect;
             _settingsService.Current.FitMode = profile.FitMode;
+            if (chosenOrder.HasValue)
+            {
+                _settingsService.Current.Order = chosenOrder.Value;
+                if (ComboPlaybackOrder != null)
+                {
+                    ComboPlaybackOrder.SelectedIndex = (int)chosenOrder.Value;
+                }
+                _mediaLibrary?.SortItems(chosenOrder.Value);
+            }
         }
 
         _settingsService.Current.FolderProfiles[_editingSourcePath] = profile;
         _settingsService.Save();
         UpdateSourceList();
-        App.Log($"Saved SourceProfile for {_editingSourcePath}: Style={profile.TransitionStyle}, Fit={profile.FitMode}");
+        App.Log($"Saved SourceProfile for {_editingSourcePath}: Style={profile.TransitionStyle}, Fit={profile.FitMode}, Order={profile.Order}");
     }
 
     private void OnSourceEffectsResetClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
@@ -785,15 +822,28 @@ public sealed partial class MainPage : Page
         ToggleDialogKenBurns.IsOn = defaultProfile.KenBurnsEffect;
         ComboDialogFitMode.SelectedIndex = (int)defaultProfile.FitMode;
 
+        bool isAllReset = string.Equals(_editingSourcePath, "ALL", StringComparison.OrdinalIgnoreCase);
+        if (ComboDialogPlaybackOrder != null)
+        {
+            ComboDialogPlaybackOrder.SelectedIndex = isAllReset ? (int)PlaybackOrder.Sequential + 1 : 0;
+        }
+
         if (_settingsService != null && !string.IsNullOrEmpty(_editingSourcePath))
         {
-            if (string.Equals(_editingSourcePath, "ALL", StringComparison.OrdinalIgnoreCase))
+            if (isAllReset)
             {
                 _settingsService.Current.TransitionStyle = defaultProfile.TransitionStyle;
                 _settingsService.Current.TransitionDurationSeconds = defaultProfile.TransitionDurationSeconds;
                 _settingsService.Current.PhotoDisplaySeconds = defaultProfile.PhotoDisplaySeconds;
                 _settingsService.Current.KenBurnsEffect = defaultProfile.KenBurnsEffect;
                 _settingsService.Current.FitMode = defaultProfile.FitMode;
+                _settingsService.Current.Order = PlaybackOrder.Sequential;
+                if (ComboPlaybackOrder != null)
+                {
+                    ComboPlaybackOrder.SelectedIndex = (int)PlaybackOrder.Sequential;
+                }
+                _mediaLibrary?.SortItems(PlaybackOrder.Sequential);
+                defaultProfile.Order = PlaybackOrder.Sequential;
             }
 
             _settingsService.Current.FolderProfiles[_editingSourcePath] = defaultProfile;

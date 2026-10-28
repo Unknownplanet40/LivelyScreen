@@ -403,27 +403,27 @@ public class MediaLibrary
                     return activeTheme.OrderedCycleItems[0];
             }
 
-            var candidateItems = _items;
-            if (!string.IsNullOrEmpty(sourceKey) && !string.Equals(sourceKey, "ALL", StringComparison.OrdinalIgnoreCase))
-            {
-                candidateItems = _items.Where(i => i.FilePath.StartsWith(sourceKey, StringComparison.OrdinalIgnoreCase)).ToList();
-            }
+            var candidateItems = string.IsNullOrEmpty(sourceKey) || string.Equals(sourceKey, "ALL", StringComparison.OrdinalIgnoreCase)
+                ? _items.ToList()
+                : _items.Where(i => i.FilePath.StartsWith(sourceKey, StringComparison.OrdinalIgnoreCase)).ToList();
 
             if (candidateItems.Count == 0)
                 return null;
 
-            if (order != _lastOrder)
+            var effectiveOrder = order;
+            var profile = _settingsService.Current.GetProfileForPath(sourceKey);
+            if (profile.Order.HasValue)
             {
-                SortItems(order);
-                _lastOrder = order;
-                _sourceSequenceIndices.Clear();
+                effectiveOrder = profile.Order.Value;
             }
 
-            if (order == PlaybackOrder.Shuffle)
+            if (effectiveOrder == PlaybackOrder.Shuffle)
             {
                 var index = _rng.Next(candidateItems.Count);
                 return candidateItems[index];
             }
+
+            SortItemList(candidateItems, effectiveOrder);
 
             _sourceSequenceIndices.TryGetValue(sourceKey, out int currentSourceIdx);
             if (currentSourceIdx >= candidateItems.Count)
@@ -448,29 +448,34 @@ public class MediaLibrary
         }
     }
 
+    public static void SortItemList(List<MediaItem> list, PlaybackOrder order)
+    {
+        switch (order)
+        {
+            case PlaybackOrder.Sequential:
+                list.Sort((a, b) => NativeMethods.StrCmpLogicalW(a.FileName, b.FileName));
+                break;
+            case PlaybackOrder.Alphabetical:
+                list.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
+                break;
+            case PlaybackOrder.DateModified:
+                list.Sort((a, b) =>
+                {
+                    try
+                    {
+                        return File.GetLastWriteTimeUtc(b.FilePath).CompareTo(File.GetLastWriteTimeUtc(a.FilePath));
+                    }
+                    catch { return 0; }
+                });
+                break;
+        }
+    }
+
     public void SortItems(PlaybackOrder order)
     {
         lock (_lock)
         {
-            switch (order)
-            {
-                case PlaybackOrder.Sequential:
-                    _items.Sort((a, b) => NativeMethods.StrCmpLogicalW(a.FileName, b.FileName));
-                    break;
-                case PlaybackOrder.Alphabetical:
-                    _items.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
-                    break;
-                case PlaybackOrder.DateModified:
-                    _items.Sort((a, b) =>
-                    {
-                        try
-                        {
-                            return File.GetLastWriteTimeUtc(b.FilePath).CompareTo(File.GetLastWriteTimeUtc(a.FilePath));
-                        }
-                        catch { return 0; }
-                    });
-                    break;
-            }
+            SortItemList(_items, order);
         }
     }
 }

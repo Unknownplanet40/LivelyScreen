@@ -2147,6 +2147,18 @@
                         <ComboBoxItem Content="Center 1:1 (No Scaling)"/>
                     </ComboBox>
                 </StackPanel>
+
+                <!-- Playback Order -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Playback Order" FontWeight="Medium" FontSize="13"/>
+                    <ComboBox x:Name="ComboDialogPlaybackOrder" HorizontalAlignment="Stretch">
+                        <ComboBoxItem x:Name="ComboItemOrderInherit" Content="Use Global Order (Default)"/>
+                        <ComboBoxItem Content="Dynamic Sequential (image1, image2...)"/>
+                        <ComboBoxItem Content="Random Shuffle"/>
+                        <ComboBoxItem Content="Alphabetical (A - Z)"/>
+                        <ComboBoxItem Content="Date Modified (Newest first)"/>
+                    </ComboBox>
+                </StackPanel>
             </StackPanel>
         </ContentDialog>
     </Grid>

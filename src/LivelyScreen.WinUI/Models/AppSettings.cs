@@ -38,6 +38,7 @@ public class SourceProfile
     public double PhotoDisplaySeconds { get; set; } = 8.0;
     public bool KenBurnsEffect { get; set; } = true;
     public MediaFitMode FitMode { get; set; } = MediaFitMode.Fill;
+    public PlaybackOrder? Order { get; set; } = null;
 }
 
 public enum AppThemeMode
@@ -151,7 +152,7 @@ public class AppSettings
     public SourceProfile GetProfileForPath(string? path)
     {
         if (string.IsNullOrEmpty(path))
-            return new SourceProfile { TransitionStyle = TransitionStyle, TransitionDurationSeconds = TransitionDurationSeconds, PhotoDisplaySeconds = PhotoDisplaySeconds, KenBurnsEffect = KenBurnsEffect, FitMode = FitMode };
+            return new SourceProfile { TransitionStyle = TransitionStyle, TransitionDurationSeconds = TransitionDurationSeconds, PhotoDisplaySeconds = PhotoDisplaySeconds, KenBurnsEffect = KenBurnsEffect, FitMode = FitMode, Order = Order };
 
         if (FolderProfiles.TryGetValue(path, out var exactProfile))
             return exactProfile;
@@ -162,7 +163,7 @@ public class AppSettings
                 return kvp.Value;
         }
 
-        return new SourceProfile { TransitionStyle = TransitionStyle, TransitionDurationSeconds = TransitionDurationSeconds, PhotoDisplaySeconds = PhotoDisplaySeconds, KenBurnsEffect = KenBurnsEffect, FitMode = FitMode };
+        return new SourceProfile { TransitionStyle = TransitionStyle, TransitionDurationSeconds = TransitionDurationSeconds, PhotoDisplaySeconds = PhotoDisplaySeconds, KenBurnsEffect = KenBurnsEffect, FitMode = FitMode, Order = Order };
     }
 
     public MediaFitMode GetFitModeForPath(string? path) => GetProfileForPath(path).FitMode;
