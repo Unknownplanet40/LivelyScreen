@@ -30,6 +30,9 @@
 
   <ItemGroup>
     <Content Include="Assets\**" />
+    <Content Include="..\..\CHANGELOG.md" Link="CHANGELOG.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

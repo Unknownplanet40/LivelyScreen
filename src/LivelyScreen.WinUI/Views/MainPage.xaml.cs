@@ -2786,7 +2786,7 @@ public sealed partial class MainPage : Page
                         }
                         if (TxtReleaseChangelog != null)
                         {
-                            TxtReleaseChangelog.Text = string.IsNullOrWhiteSpace(rel.Changelog) ? "No release notes provided." : rel.Changelog;
+                            TxtReleaseChangelog.Text = GetChangelogForVersion(rel.TagName, rel.Changelog);
                         }
                     }
 
@@ -2984,6 +2984,42 @@ public sealed partial class MainPage : Page
         LivePreviewQuoteCard?.ShowNextQuoteImmediate(true);
         MiniPreviewQuoteWidget?.ShowNextQuoteImmediate(true);
         UpdateAllWidgetPositionPreviews();
+    }
+
+    private string GetChangelogForVersion(string tagName, string remoteChangelog)
+    {
+        if (!string.IsNullOrWhiteSpace(remoteChangelog) && !remoteChangelog.Trim().StartsWith("**Full Changelog**"))
+        {
+            return remoteChangelog.Trim();
+        }
+
+        try
+        {
+            string version = tagName.TrimStart('v', 'V');
+            string[] candidatePaths = [
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CHANGELOG.md"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "CHANGELOG.md")
+            ];
+
+            foreach (var p in candidatePaths)
+            {
+                if (File.Exists(p))
+                {
+                    string text = File.ReadAllText(p);
+                    var match = System.Text.RegularExpressions.Regex.Match(
+                        text,
+                        @"(?s)## \[" + System.Text.RegularExpressions.Regex.Escape(version) + @"\][^\r\n]*\r?\n(.*?)(?=\r?\n## \[|\Z)"
+                    );
+                    if (match.Success)
+                    {
+                        return match.Groups[1].Value.Trim();
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return !string.IsNullOrWhiteSpace(remoteChangelog) ? remoteChangelog : "No release notes provided.";
     }
 
 }

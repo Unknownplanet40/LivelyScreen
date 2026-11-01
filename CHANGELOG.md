@@ -1,0 +1,81 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.7] - 2026-11-01
+
+### Added
+- **Multi-Source Wisdom & Quotes Engine**: Load quotes and cultural sayings from SQLite knowledge bases (`.db`), local JSON files (`.json`), or remote HTTPS endpoints.
+- **Flexible JSON Schema Parser**: Ingest quotes formatted as root arrays or wrapped objects (`quotes`, `entries`, `data`, `items`) with property aliases (`quote`, `text`, `content`, `author`, `meaning`, `category`).
+- **Offline Fallback Caching**: Remote HTTPS quotes are automatically cached locally in AppData to guarantee instant availability when offline.
+- **Curated Fallback Library**: 26 timeless literary quotes, Stoic maxims, and cultural proverbs included out of the box with explanations and cultural context.
+- **Second-Stage Auto-Blackout Sleep**: Added toggle and mode dropdown to optionally trigger full system standby (PC sleep) or monitor power-off after prolonged screensaver idle.
+- **Instant Resume Dismissal**: Screen immediately unlocks and closes the screensaver upon system wake from standby.
+- **Per-Folder Playback Ordering**: Added sequential, shuffle, alphabetical, and date-modified playback order options in the folder settings dialog.
+
+### Fixed
+- Prevented dynamic wallpaper playback leaks and isolated timers during multi-monitor transition cycles.
+
+## [1.0.6] - 2026-10-24
+
+### Fixed
+- Released file handle lock on downloaded installer before launching setup process to prevent update installation failures.
+- Automated application relaunch following update completion.
+
+## [1.0.5] - 2026-10-24
+
+### Added
+- Built-in GitHub update notification system with background checking and in-app release notes viewer.
+
+### Fixed
+- Resolved taskbar flashing and foreground z-order issues across multi-monitor fullscreen screensaver sessions.
+
+## [1.0.4] - 2026-10-20
+
+### Added
+- Per-monitor widget configuration with independent layouts across displays.
+- Top-right acrylic battery badge and low-power charging status indicator.
+
+### Changed
+- Made screensaver manual activation hotkey configurable with `Ctrl+Alt+S` default.
+
+## [1.0.3] - 2026-10-20
+
+### Fixed
+- Ensured PRI resources, XBF markup, and visual asset manifests are properly bundled in unpackaged deployment outputs.
+
+## [1.0.2] - 2026-10-20
+
+### Added
+- Inno Setup installer script for standard Windows desktop installation and uninstallation.
+- GitHub Actions CI/CD release workflow for automated x64 packaging.
+
+## [1.0.1] - 2026-10-19
+
+### Changed
+- Standardized release artifacts to deliver standalone zip bundles.
+
+## [1.0.0] - 2026-10-19
+
+### Added
+- Initial release of LivelyScreen for Windows 10/11 using WinUI 3 and Windows App SDK.
+- Support for video wallpapers (MP4, MKV, WebM) and high-resolution photo slideshows.
+- Fluid transitions including Crossfade, Wipe, Slide, Zoom, and Ken Burns motion effects.
+- Dynamic time-locked solar themes with sunrise/sunset auto-switching.
+- Customizable desktop widgets: Clock, Weather, Media/Now Playing, System Performance, Calendar, and KnowledgeBase Wisdom cards.
+- Multi-monitor modes: Span Across All, Duplicate/Clone, and Independent Per-Display playlist assignments.
+
+[Unreleased]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.6...v1.0.7
+[1.0.6]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.5...v1.0.6
+[1.0.5]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.4...v1.0.5
+[1.0.4]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.3...v1.0.4
+[1.0.3]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.2...v1.0.3
+[1.0.2]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/Unknownplanet40/LivelyScreen/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/Unknownplanet40/LivelyScreen/releases/tag/v1.0.0

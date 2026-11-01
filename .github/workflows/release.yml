@@ -39,11 +39,27 @@ jobs:
           if (-not $tagVersion) { $tagVersion = "1.0.0" }
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$tagVersion" installer/LivelyScreen.iss
 
+      - name: Extract Release Notes from CHANGELOG
+        shell: pwsh
+        run: |
+          $tagVersion = "${{ github.ref_name }}".TrimStart('v')
+          $changelog = Get-Content -Raw "CHANGELOG.md" -ErrorAction SilentlyContinue
+          $pattern = "(?s)## \[" + [regex]::Escape($tagVersion) + "\][^
+]*?
+(.*?)(?=?
+## \[|\z)"
+          if ($changelog -and ($changelog -match $pattern)) {
+              $notes = $matches[1].Trim()
+              Set-Content -Path "RELEASE_NOTES.md" -Value $notes -Encoding utf8
+          } else {
+              Set-Content -Path "RELEASE_NOTES.md" -Value "Release $tagVersion" -Encoding utf8
+          }
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          body_path: RELEASE_NOTES.md
           files: |
             installer/LivelyScreen-Setup-win-x64.exe
             LivelyScreen-win-x64.zip
-          generate_release_notes: true
