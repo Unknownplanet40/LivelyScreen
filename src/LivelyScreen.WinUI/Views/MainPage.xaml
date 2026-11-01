@@ -705,6 +705,16 @@
                             </ComboBox>
                         </labs:SettingsCard>
 
+                        <labs:SettingsCard x:Name="CardAutoBlackoutSleep" Header="Sleep Device on Blackout" Description="Put the computer into sleep or turn off displays when second-stage blackout activates.">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <ComboBox x:Name="ComboAutoBlackoutSleepMode" SelectionChanged="OnSettingChanged" Width="180">
+                                    <ComboBoxItem Content="System Sleep (PC Standby)"/>
+                                    <ComboBoxItem Content="Turn Off Displays"/>
+                                </ComboBox>
+                                <ToggleSwitch x:Name="ToggleAutoBlackoutSleep" Toggled="OnSettingChanged"/>
+                            </StackPanel>
+                        </labs:SettingsCard>
+
                         <!-- HOT CORNERS -->
                         <TextBlock Text="Hot Corners" Style="{StaticResource SubtitleTextBlockStyle}" Margin="0,16,0,4"/>
                         <TextBlock Text="Trigger or inhibit the screensaver by resting the mouse cursor in screen corners." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>

@@ -102,6 +102,12 @@ public enum HotCornerZone
     BottomRight = 4
 }
 
+public enum AutoBlackoutSleepMode
+{
+    SystemSleep = 0,
+    DisplaySleep = 1
+}
+
 public class AppSettings
 {
     public AppThemeMode ThemePreference { get; set; } = AppThemeMode.System;
@@ -184,6 +190,8 @@ public class AppSettings
     public bool AllowDisplaySleep { get; set; } = true;
     public bool OledPixelShiftEnabled { get; set; } = true;
     public int AutoBlackoutMinutes { get; set; } = 0; // 0 = Disabled, >0 = fade to black & allow sleep after idle minutes
+    public bool AutoBlackoutSleepEnabled { get; set; } = false;
+    public AutoBlackoutSleepMode AutoBlackoutSleepAction { get; set; } = AutoBlackoutSleepMode.SystemSleep;
 
     // Clock Overlay
     public bool WidgetsEnabled { get; set; } = true;

@@ -324,6 +324,14 @@ public sealed partial class ScreensaverWindow : Window
                 TriggerDismiss();
                 break;
 
+            case NativeMethods.WM_POWERBROADCAST:
+                if (wParam.ToInt32() == NativeMethods.PBT_APMRESUMEAUTOMATIC || wParam.ToInt32() == NativeMethods.PBT_APMRESUMESUSPEND)
+                {
+                    App.Log("System resumed from sleep, dismissing screensaver.");
+                    TriggerDismiss();
+                }
+                break;
+
             case WM_NCCALCSIZE:
                 // Returning 0 indicates client area occupies 100% of the window rectangle, leaving 0 non-client pixels
                 return IntPtr.Zero;
@@ -1611,6 +1619,27 @@ public sealed partial class ScreensaverWindow : Window
 
         // Release Windows display sleep restriction so monitors can enter standby
         NativeMethods.SetThreadExecutionState(NativeMethods.EXECUTION_STATE.ES_CONTINUOUS);
+
+        var s = _settingsService.Current;
+        if (IsMaster && s.AllowDisplaySleep && s.AutoBlackoutSleepEnabled)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                if (_isClosing) return;
+
+                if (s.AutoBlackoutSleepAction == AutoBlackoutSleepMode.DisplaySleep)
+                {
+                    App.Log("Auto-blackout sleep triggered: sending displays to sleep (SC_MONITORPOWER).");
+                    NativeMethods.SendMessage((IntPtr)NativeMethods.HWND_BROADCAST, NativeMethods.WM_SYSCOMMAND, (IntPtr)NativeMethods.SC_MONITORPOWER, (IntPtr)2);
+                }
+                else
+                {
+                    App.Log("Auto-blackout sleep triggered: putting system to sleep (SetSuspendState).");
+                    NativeMethods.SetSuspendState(false, true, false);
+                }
+            });
+        }
     }
 
     private void StartClockShuffleTimer()

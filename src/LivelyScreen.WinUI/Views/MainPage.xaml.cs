@@ -163,6 +163,9 @@ public sealed partial class MainPage : Page
             60 => 5,
             _ => 0
         };
+        if (ToggleAutoBlackoutSleep != null) ToggleAutoBlackoutSleep.IsOn = s.AutoBlackoutSleepEnabled;
+        if (ComboAutoBlackoutSleepMode != null) ComboAutoBlackoutSleepMode.SelectedIndex = (int)s.AutoBlackoutSleepAction;
+        UpdateAutoBlackoutSleepCardState();
         ComboTriggerCorner.SelectedIndex = (int)s.TriggerCorner;
         ComboDisableCorner.SelectedIndex = (int)s.DisableCorner;
         TogglePauseOnBattery.IsOn = s.PauseOnBattery;
@@ -1455,6 +1458,11 @@ public sealed partial class MainPage : Page
             5 => 60,
             _ => 0
         };
+        if (ToggleAutoBlackoutSleep != null)
+            s.AutoBlackoutSleepEnabled = ToggleAutoBlackoutSleep.IsOn;
+        if (ComboAutoBlackoutSleepMode != null && ComboAutoBlackoutSleepMode.SelectedIndex >= 0)
+            s.AutoBlackoutSleepAction = (AutoBlackoutSleepMode)ComboAutoBlackoutSleepMode.SelectedIndex;
+        UpdateAutoBlackoutSleepCardState();
 
         if (ComboTriggerCorner != null && ComboTriggerCorner.SelectedIndex >= 0)
             s.TriggerCorner = (HotCornerZone)ComboTriggerCorner.SelectedIndex;
@@ -2885,4 +2893,16 @@ public sealed partial class MainPage : Page
             PanelPaneFooter.Margin = isPaneOpen ? new Thickness(12, 8, 12, 8) : new Thickness(4, 8, 4, 8);
         }
     }
+    private void UpdateAutoBlackoutSleepCardState()
+    {
+        if (CardAutoBlackoutSleep == null) return;
+
+        bool prerequisitesMet = (ToggleDisplaySleep?.IsOn ?? false) && (ComboAutoBlackout?.SelectedIndex > 0);
+        CardAutoBlackoutSleep.IsEnabled = prerequisitesMet;
+        if (ComboAutoBlackoutSleepMode != null)
+        {
+            ComboAutoBlackoutSleepMode.IsEnabled = prerequisitesMet && (ToggleAutoBlackoutSleep?.IsOn ?? false);
+        }
+    }
+
 }

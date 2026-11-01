@@ -387,6 +387,18 @@ public static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("powrprof.dll", SetLastError = true)]
+    public static extern bool SetSuspendState(bool hibernate, bool forceCritical, bool disableWakeEvent);
+
+    public const uint WM_SYSCOMMAND = 0x0112;
+    public const int SC_MONITORPOWER = 0xF170;
+    public const uint WM_POWERBROADCAST = 0x0218;
+    public const int PBT_APMRESUMEAUTOMATIC = 0x0012;
+    public const int PBT_APMRESUMESUSPEND = 0x0007;
+
     public const int HWND_BROADCAST = 0xffff;
 
     [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
