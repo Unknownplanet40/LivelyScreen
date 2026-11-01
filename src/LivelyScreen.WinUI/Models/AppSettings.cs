@@ -108,6 +108,13 @@ public enum AutoBlackoutSleepMode
     DisplaySleep = 1
 }
 
+public enum QuoteSourceType
+{
+    SqliteDatabase = 0,
+    LocalJson = 1,
+    OnlineUrl = 2
+}
+
 public class AppSettings
 {
     public AppThemeMode ThemePreference { get; set; } = AppThemeMode.System;
@@ -273,7 +280,11 @@ public class AppSettings
     public bool QuoteShowAuthor { get; set; } = true;
     public bool QuoteShowMeaning { get; set; } = true;
     public int QuoteRotationIntervalSeconds { get; set; } = 30;
+    public QuoteSourceType QuoteSource { get; set; } = QuoteSourceType.SqliteDatabase;
     public string QuoteDatabasePath { get; set; } = "";
+    public string QuoteLocalJsonPath { get; set; } = "";
+    public string QuoteOnlineUrl { get; set; } = "";
+    public DateTime QuoteLastOnlineSync { get; set; } = DateTime.MinValue;
     public string QuotesCacheJson { get; set; } = "";
 
     // Post-Processing Filters & EXIF Pill

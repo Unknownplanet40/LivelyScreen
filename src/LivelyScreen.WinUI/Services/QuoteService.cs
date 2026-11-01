@@ -1,10 +1,13 @@
+using LivelyScreen.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using LivelyScreen_WinUI;
 
 namespace LivelyScreen.Services;
 
@@ -58,9 +61,11 @@ public static class QuoteService
         "quotes_cache.json"
     );
 
+    private static readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(6) };
     private static readonly object _syncLock = new();
     private static List<QuoteItem> _cachedQuotes = new();
     private static string _lastLoadedPath = "";
+    private static QuoteSourceType _lastSourceType = QuoteSourceType.SqliteDatabase;
     private static DateTime _lastFileWriteTime = DateTime.MinValue;
     private static int _currentIndex = -1;
     private static readonly Random _rng = new();
@@ -105,61 +110,239 @@ public static class QuoteService
 
     public static List<QuoteItem> EnsureQuotesLoaded(string? configuredPath, bool forceReload = false)
     {
-        string resolved = ResolveDatabasePath(configuredPath);
-        ResolvedDatabasePath = resolved;
+        return EnsureQuotesLoaded(configuredPath, QuoteSourceType.SqliteDatabase, forceReload);
+    }
+
+    public static List<QuoteItem> EnsureQuotesLoaded(string? configuredPath, QuoteSourceType sourceType, bool forceReload = false)
+    {
+        // Auto-detect source if passed a URL or json path
+        if (sourceType == QuoteSourceType.SqliteDatabase && !string.IsNullOrWhiteSpace(configuredPath))
+        {
+            if (configuredPath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                configuredPath.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceType = QuoteSourceType.OnlineUrl;
+            }
+            else if (configuredPath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceType = QuoteSourceType.LocalJson;
+            }
+        }
 
         lock (_syncLock)
         {
-            try
+            if (sourceType == QuoteSourceType.OnlineUrl)
             {
-                if (File.Exists(resolved))
-                {
-                    DateTime writeTime = File.GetLastWriteTimeUtc(resolved);
-                    if (!forceReload && _cachedQuotes.Count > 0 && !UsingFallbackCache &&
-                        string.Equals(_lastLoadedPath, resolved, StringComparison.OrdinalIgnoreCase) &&
-                        writeTime == _lastFileWriteTime)
-                    {
-                        return _cachedQuotes;
-                    }
-
-                    var fromDb = QuerySqliteDatabase(resolved);
-                    if (fromDb.Count > 0)
-                    {
-                        _cachedQuotes = fromDb;
-                        _lastLoadedPath = resolved;
-                        _lastFileWriteTime = writeTime;
-                        UsingFallbackCache = false;
-                        int quoteCount = fromDb.Count(q => q.Type.Equals("quote", StringComparison.OrdinalIgnoreCase));
-                        int sayingCount = fromDb.Count - quoteCount;
-                        LastStatusMessage = $"Connected • {fromDb.Count} items ({quoteCount} quotes, {sayingCount} sayings)";
-                        SaveBackupCache(fromDb);
-                        return _cachedQuotes;
-                    }
-                }
+                return LoadFromOnlineUrl(configuredPath, forceReload);
             }
-            catch { }
+            else if (sourceType == QuoteSourceType.LocalJson)
+            {
+                return LoadFromLocalJson(configuredPath, forceReload);
+            }
+            else
+            {
+                return LoadFromSqlite(configuredPath, forceReload);
+            }
+        }
+    }
 
-            // Fallback to local persisted JSON cache if DB moved or OneDrive is syncing
+    private static List<QuoteItem> LoadFromOnlineUrl(string? url, bool forceReload)
+    {
+        string rawUrl = url?.Trim() ?? "";
+        ResolvedDatabasePath = rawUrl;
+
+        if (string.IsNullOrWhiteSpace(rawUrl))
+        {
+            var fallback = LoadBackupCache();
+            if (fallback.Count > 0)
+            {
+                _cachedQuotes = fallback;
+                UsingFallbackCache = true;
+                LastStatusMessage = $"No URL set • Using {fallback.Count} cached quotes";
+                return _cachedQuotes;
+            }
+            _cachedQuotes = GetDefaultFallbackQuotes();
+            UsingFallbackCache = true;
+            LastStatusMessage = "No URL configured • Using default quotes";
+            return _cachedQuotes;
+        }
+
+        if (!forceReload && _cachedQuotes.Count > 0 && !UsingFallbackCache &&
+            _lastSourceType == QuoteSourceType.OnlineUrl &&
+            string.Equals(_lastLoadedPath, rawUrl, StringComparison.OrdinalIgnoreCase))
+        {
+            return _cachedQuotes;
+        }
+
+        try
+        {
+            App.Log($"Fetching quotes from online URL: {rawUrl}");
+            using var req = new HttpRequestMessage(HttpMethod.Get, rawUrl);
+            req.Headers.Add("User-Agent", "LivelyScreen/1.0");
+            using var resp = _httpClient.Send(req);
+            resp.EnsureSuccessStatusCode();
+
+            using var stream = resp.Content.ReadAsStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+            string json = reader.ReadToEnd();
+
+            var quotes = ParseFlexibleJson(json);
+            if (quotes.Count > 0)
+            {
+                _cachedQuotes = quotes;
+                _lastLoadedPath = rawUrl;
+                _lastSourceType = QuoteSourceType.OnlineUrl;
+                UsingFallbackCache = false;
+                LastStatusMessage = $"Online Synced • {quotes.Count} quotes loaded";
+                SaveBackupCache(quotes);
+                return _cachedQuotes;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Error fetching online quotes: {ex.Message}");
+        }
+
+        var backup = LoadBackupCache();
+        if (backup.Count > 0)
+        {
+            _cachedQuotes = backup;
+            UsingFallbackCache = true;
+            LastStatusMessage = $"Source offline • Using {backup.Count} cached quotes";
+            return _cachedQuotes;
+        }
+
+        _cachedQuotes = GetDefaultFallbackQuotes();
+        UsingFallbackCache = true;
+        LastStatusMessage = "Online source unreachable • Using default quotes";
+        return _cachedQuotes;
+    }
+
+    private static List<QuoteItem> LoadFromLocalJson(string? filePath, bool forceReload)
+    {
+        string raw = filePath?.Trim().Trim('"') ?? "";
+        ResolvedDatabasePath = raw;
+
+        if (string.IsNullOrWhiteSpace(raw) || !File.Exists(raw))
+        {
             var backup = LoadBackupCache();
             if (backup.Count > 0)
             {
                 _cachedQuotes = backup;
                 UsingFallbackCache = true;
-                LastStatusMessage = $"Source offline • Using {backup.Count} cached quotes";
+                LastStatusMessage = $"File not found • Using {backup.Count} cached quotes";
+                return _cachedQuotes;
+            }
+            _cachedQuotes = GetDefaultFallbackQuotes();
+            UsingFallbackCache = true;
+            LastStatusMessage = "JSON file not found • Using default quotes";
+            return _cachedQuotes;
+        }
+
+        try
+        {
+            DateTime writeTime = File.GetLastWriteTimeUtc(raw);
+            if (!forceReload && _cachedQuotes.Count > 0 && !UsingFallbackCache &&
+                _lastSourceType == QuoteSourceType.LocalJson &&
+                string.Equals(_lastLoadedPath, raw, StringComparison.OrdinalIgnoreCase) &&
+                writeTime == _lastFileWriteTime)
+            {
                 return _cachedQuotes;
             }
 
-            // Ultimate built-in fallback
-            _cachedQuotes = GetDefaultFallbackQuotes();
+            string json = File.ReadAllText(raw, Encoding.UTF8);
+            var quotes = ParseFlexibleJson(json);
+            if (quotes.Count > 0)
+            {
+                _cachedQuotes = quotes;
+                _lastLoadedPath = raw;
+                _lastSourceType = QuoteSourceType.LocalJson;
+                _lastFileWriteTime = writeTime;
+                UsingFallbackCache = false;
+                LastStatusMessage = $"Local JSON • {quotes.Count} quotes loaded";
+                SaveBackupCache(quotes);
+                return _cachedQuotes;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Error loading local quote JSON: {ex.Message}");
+        }
+
+        var backupCache = LoadBackupCache();
+        if (backupCache.Count > 0)
+        {
+            _cachedQuotes = backupCache;
             UsingFallbackCache = true;
-            LastStatusMessage = "Database not found • Using default quotes";
+            LastStatusMessage = $"File invalid • Using {backupCache.Count} cached quotes";
             return _cachedQuotes;
         }
+
+        _cachedQuotes = GetDefaultFallbackQuotes();
+        UsingFallbackCache = true;
+        LastStatusMessage = "Invalid JSON format • Using default quotes";
+        return _cachedQuotes;
+    }
+
+    private static List<QuoteItem> LoadFromSqlite(string? configuredPath, bool forceReload)
+    {
+        string resolved = ResolveDatabasePath(configuredPath);
+        ResolvedDatabasePath = resolved;
+
+        try
+        {
+            if (File.Exists(resolved))
+            {
+                DateTime writeTime = File.GetLastWriteTimeUtc(resolved);
+                if (!forceReload && _cachedQuotes.Count > 0 && !UsingFallbackCache &&
+                    _lastSourceType == QuoteSourceType.SqliteDatabase &&
+                    string.Equals(_lastLoadedPath, resolved, StringComparison.OrdinalIgnoreCase) &&
+                    writeTime == _lastFileWriteTime)
+                {
+                    return _cachedQuotes;
+                }
+
+                var fromDb = QuerySqliteDatabase(resolved);
+                if (fromDb.Count > 0)
+                {
+                    _cachedQuotes = fromDb;
+                    _lastLoadedPath = resolved;
+                    _lastSourceType = QuoteSourceType.SqliteDatabase;
+                    _lastFileWriteTime = writeTime;
+                    UsingFallbackCache = false;
+                    int quoteCount = fromDb.Count(q => q.Type.Equals("quote", StringComparison.OrdinalIgnoreCase));
+                    int sayingCount = fromDb.Count - quoteCount;
+                    LastStatusMessage = $"Connected • {fromDb.Count} items ({quoteCount} quotes, {sayingCount} sayings)";
+                    SaveBackupCache(fromDb);
+                    return _cachedQuotes;
+                }
+            }
+        }
+        catch { }
+
+        var backup = LoadBackupCache();
+        if (backup.Count > 0)
+        {
+            _cachedQuotes = backup;
+            UsingFallbackCache = true;
+            LastStatusMessage = $"Source offline • Using {backup.Count} cached quotes";
+            return _cachedQuotes;
+        }
+
+        _cachedQuotes = GetDefaultFallbackQuotes();
+        UsingFallbackCache = true;
+        LastStatusMessage = "Database not found • Using default quotes";
+        return _cachedQuotes;
     }
 
     public static QuoteItem GetNextQuote(string? configuredPath, bool randomOrder = true)
     {
-        var list = EnsureQuotesLoaded(configuredPath);
+        return GetNextQuote(configuredPath, QuoteSourceType.SqliteDatabase, randomOrder);
+    }
+
+    public static QuoteItem GetNextQuote(string? configuredPath, QuoteSourceType sourceType, bool randomOrder = true)
+    {
+        var list = EnsureQuotesLoaded(configuredPath, sourceType);
         lock (_syncLock)
         {
             if (list.Count == 0)
@@ -193,6 +376,120 @@ public static class QuoteService
 
             return list[_currentIndex];
         }
+    }
+
+    public static List<QuoteItem> ParseFlexibleJson(string jsonText)
+    {
+        var results = new List<QuoteItem>();
+        if (string.IsNullOrWhiteSpace(jsonText))
+            return results;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            JsonElement root = doc.RootElement;
+            JsonElement itemsArray;
+
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                itemsArray = root;
+            }
+            else if (root.ValueKind == JsonValueKind.Object)
+            {
+                if (root.TryGetProperty("quotes", out var q) && q.ValueKind == JsonValueKind.Array)
+                    itemsArray = q;
+                else if (root.TryGetProperty("entries", out var e) && e.ValueKind == JsonValueKind.Array)
+                    itemsArray = e;
+                else if (root.TryGetProperty("data", out var d) && d.ValueKind == JsonValueKind.Array)
+                    itemsArray = d;
+                else if (root.TryGetProperty("items", out var it) && it.ValueKind == JsonValueKind.Array)
+                    itemsArray = it;
+                else if (root.TryGetProperty("sayings", out var s) && s.ValueKind == JsonValueKind.Array)
+                    itemsArray = s;
+                else
+                    return results;
+            }
+            else
+            {
+                return results;
+            }
+
+            int idCounter = 1;
+            foreach (var elem in itemsArray.EnumerateArray())
+            {
+                if (elem.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                string quoteText = GetElementPropertyString(elem, "quoteText", "quotetext", "quote", "content", "text", "body", "saying", "title");
+                if (string.IsNullOrWhiteSpace(quoteText))
+                    continue;
+
+                string author = GetElementPropertyString(elem, "author", "authorLine", "speaker", "by");
+                string source = GetElementPropertyString(elem, "source", "book", "work", "origin");
+                string type = GetElementPropertyString(elem, "type", "category", "genre", "tag");
+                if (string.IsNullOrWhiteSpace(type))
+                    type = "Quote";
+
+                string meaningHeading = GetElementPropertyString(elem, "meaningHeading", "meaningheading");
+                string meaningText = GetElementPropertyString(elem, "meaningText", "meaningtext", "meaning", "description", "context", "notes", "explanation");
+
+                string cleanQuote = quoteText.Replace("\uFFFD", "").Trim().Trim('"', '\'', '\u201C', '\u201D').Trim();
+                string authorLine = FormatAuthorAndSource(author, source);
+                if (string.IsNullOrWhiteSpace(meaningHeading) && !string.IsNullOrWhiteSpace(meaningText))
+                {
+                    meaningHeading = type.Equals("Saying", StringComparison.OrdinalIgnoreCase) ? "Origin & Cultural Meaning" : "Context & Meaning";
+                }
+
+                string cleanSubtext = !string.IsNullOrEmpty(authorLine)
+                    ? authorLine
+                    : (!string.IsNullOrEmpty(meaningText) ? meaningText : "");
+
+                results.Add(new QuoteItem
+                {
+                    Id = idCounter++,
+                    Type = FormatTypeBadge(type),
+                    QuoteText = cleanQuote,
+                    AuthorLine = authorLine,
+                    MeaningHeading = meaningHeading,
+                    MeaningText = meaningText,
+                    Subtext = cleanSubtext,
+                    Author = author,
+                    Source = source
+                });
+            }
+        }
+        catch { }
+
+        return results;
+    }
+
+    private static string GetElementPropertyString(JsonElement elem, params string[] propNames)
+    {
+        foreach (var name in propNames)
+        {
+            if (elem.TryGetProperty(name, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.String)
+                {
+                    var val = prop.GetString();
+                    if (!string.IsNullOrWhiteSpace(val)) return val.Trim();
+                }
+                else if (prop.ValueKind == JsonValueKind.Array)
+                {
+                    var parts = new List<string>();
+                    foreach (var item in prop.EnumerateArray())
+                    {
+                        if (item.ValueKind == JsonValueKind.String)
+                        {
+                            var s = item.GetString();
+                            if (!string.IsNullOrWhiteSpace(s)) parts.Add(s);
+                        }
+                    }
+                    if (parts.Count > 0) return string.Join(", ", parts);
+                }
+            }
+        }
+        return "";
     }
 
     private static List<QuoteItem> QuerySqliteDatabase(string dbFilePath)
@@ -284,7 +581,7 @@ public static class QuoteService
             candidate = firstLine.Trim();
         }
 
-        candidate = candidate.Replace("\uFFFD", "").Trim().Trim('"', '“', '”', '\'').Trim();
+        candidate = candidate.Replace("\uFFFD", "").Trim().Trim('"', '\'', '\u201C', '\u201D').Trim();
         return candidate;
     }
 
@@ -389,7 +686,7 @@ public static class QuoteService
             if (!string.IsNullOrEmpty(dir))
                 Directory.CreateDirectory(dir);
             string json = JsonSerializer.Serialize(items);
-            File.WriteAllText(CacheFilePath, json);
+            File.WriteAllText(CacheFilePath, json, Encoding.UTF8);
         }
         catch { }
     }
@@ -400,7 +697,7 @@ public static class QuoteService
         {
             if (File.Exists(CacheFilePath))
             {
-                string json = File.ReadAllText(CacheFilePath);
+                string json = File.ReadAllText(CacheFilePath, Encoding.UTF8);
                 var items = JsonSerializer.Deserialize<List<QuoteItem>>(json);
                 if (items != null && items.Count > 0 && items.Any(i => !string.IsNullOrEmpty(i.MeaningText) || !string.IsNullOrEmpty(i.AuthorLine)))
                     return items;
@@ -419,11 +716,218 @@ public static class QuoteService
             QuoteText = "No matter how good you are, the wrong room will never see your value",
             AuthorLine = "",
             MeaningHeading = "Origin & Cultural Meaning",
-            MeaningText = "If you're in a place that doesn't appreciate you, your effort won't be recognized, no matter how skilled you are. It's okay to look for people and places that value you."
+            MeaningText = "If you're in a place that doesn't appreciate you, your effort won't be recognized, no matter how skilled you are. It's okay to seek spaces that value you."
         },
         new QuoteItem
         {
             Id = 2,
+            Type = "Quote",
+            QuoteText = "We suffer more often in imagination than in reality",
+            AuthorLine = "— Seneca  •  Letters from a Stoic",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Anticipated fears and anxiety cause far more distress than the actual events when they arrive."
+        },
+        new QuoteItem
+        {
+            Id = 3,
+            Type = "Quote",
+            QuoteText = "The soul becomes dyed with the color of its thoughts",
+            AuthorLine = "— Marcus Aurelius  •  Meditations",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "What you dwell upon shapes your perception, character, and mental clarity over time."
+        },
+        new QuoteItem
+        {
+            Id = 4,
+            Type = "Saying",
+            QuoteText = "A fish with its mouth shut avoids the hook",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Silence and thoughtful discretion protect against unnecessary conflict and regret."
+        },
+        new QuoteItem
+        {
+            Id = 5,
+            Type = "Quote",
+            QuoteText = "The wound is the place where the Light enters you",
+            AuthorLine = "— Rumi",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Pain and adversity break open illusions, creating space for deeper insight and compassion."
+        },
+        new QuoteItem
+        {
+            Id = 6,
+            Type = "Quote",
+            QuoteText = "He who conquers others is strong; he who conquers himself is mighty",
+            AuthorLine = "— Lao Tzu  •  Tao Te Ching",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Self-mastery and emotional discipline are far greater feats than dominance over others."
+        },
+        new QuoteItem
+        {
+            Id = 7,
+            Type = "Saying",
+            QuoteText = "Fall seven times, stand up eight",
+            AuthorLine = "— Japanese Proverb",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Resilience is not the absence of stumbling, but the decision to rise each time."
+        },
+        new QuoteItem
+        {
+            Id = 8,
+            Type = "Saying",
+            QuoteText = "Smooth seas do not make skillful sailors",
+            AuthorLine = "— African Proverb",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Comfort rarely builds competence; rough waters and trials forge true ability."
+        },
+        new QuoteItem
+        {
+            Id = 9,
+            Type = "Quote",
+            QuoteText = "It is not that we have a short time to live, but that we waste a lot of it",
+            AuthorLine = "— Seneca  •  On the Shortness of Life",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Life is long enough when invested intentionally rather than scattered on trivialities."
+        },
+        new QuoteItem
+        {
+            Id = 10,
+            Type = "Saying",
+            QuoteText = "If you want to go fast, go alone; if you want to go far, go together",
+            AuthorLine = "— African Proverb",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Individual effort brings quick progress, but enduring achievements rely on community."
+        },
+        new QuoteItem
+        {
+            Id = 11,
+            Type = "Quote",
+            QuoteText = "Waste no more time arguing about what a good man should be. Be one.",
+            AuthorLine = "— Marcus Aurelius  •  Meditations",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Philosophy without action is useless debate; embody virtue through daily deeds."
+        },
+        new QuoteItem
+        {
+            Id = 12,
+            Type = "Saying",
+            QuoteText = "A tree that bends does not break in the storm",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Adaptability and flexibility outlast rigid resistance under pressure."
+        },
+        new QuoteItem
+        {
+            Id = 13,
+            Type = "Saying",
+            QuoteText = "Quiet waters run deep, loud rivers are shallow",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Substance and genuine strength carry quiet confidence without need for loud spectacle."
+        },
+        new QuoteItem
+        {
+            Id = 14,
+            Type = "Quote",
+            QuoteText = "Knowing yourself is the beginning of all wisdom",
+            AuthorLine = "— Aristotle",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "All outer judgment and discernment begin with honest awareness of your own tendencies."
+        },
+        new QuoteItem
+        {
+            Id = 15,
+            Type = "Quote",
+            QuoteText = "A journey of a thousand miles begins with a single step",
+            AuthorLine = "— Lao Tzu  •  Tao Te Ching",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Monumental undertakings are conquered only by committing to the first modest action."
+        },
+        new QuoteItem
+        {
+            Id = 16,
+            Type = "Saying",
+            QuoteText = "Silence is an answer too, and often the loudest one",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Refusing to engage or validate noise communicates clear boundaries."
+        },
+        new QuoteItem
+        {
+            Id = 17,
+            Type = "Saying",
+            QuoteText = "Do not be afraid of growing slowly, be afraid only of standing still",
+            AuthorLine = "— Chinese Proverb",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Incremental, steady development compounds into extraordinary results over time."
+        },
+        new QuoteItem
+        {
+            Id = 18,
+            Type = "Quote",
+            QuoteText = "You have power over your mind, not outside events. Realize this, and you will find strength.",
+            AuthorLine = "— Marcus Aurelius  •  Meditations",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "External conditions are outside your control; your judgment and response are entirely yours."
+        },
+        new QuoteItem
+        {
+            Id = 19,
+            Type = "Saying",
+            QuoteText = "The tongue has no bones, but it can break hearts",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "Careless speech inflicts deep and lasting damage; weigh your words before speaking."
+        },
+        new QuoteItem
+        {
+            Id = 20,
+            Type = "Quote",
+            QuoteText = "In the middle of difficulty lies opportunity",
+            AuthorLine = "— Albert Einstein",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Obstacles force creative pivots and reveal answers invisible during easy times."
+        },
+        new QuoteItem
+        {
+            Id = 21,
+            Type = "Quote",
+            QuoteText = "Do not look back in anger, or forward in fear, but around in awareness",
+            AuthorLine = "— James Thurber",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Dwelling in past grievance or future worry blinds you to what is present right now."
+        },
+        new QuoteItem
+        {
+            Id = 22,
+            Type = "Quote",
+            QuoteText = "A river cuts through rock not because of its power, but because of its persistence",
+            AuthorLine = "— Jim Watkins",
+            MeaningHeading = "Context & Meaning",
+            MeaningText = "Consistent, focused repetition overcomes barriers that sudden bursts of force cannot."
+        },
+        new QuoteItem
+        {
+            Id = 23,
+            Type = "Saying",
+            QuoteText = "A bird does not sing because it has an answer, it sings because it has a song",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "True expression stems from inherent nature and purpose, not seeking external approval."
+        },
+        new QuoteItem
+        {
+            Id = 24,
+            Type = "Saying",
+            QuoteText = "Beware the calm waters, for still depths conceal the strongest currents",
+            AuthorLine = "",
+            MeaningHeading = "Origin & Cultural Meaning",
+            MeaningText = "External stillness can mask immense hidden power and rapid movement underneath."
+        },
+        new QuoteItem
+        {
+            Id = 25,
             Type = "Quote",
             QuoteText = "Rule number five, show no love, love will get you killed",
             AuthorLine = "— 50 Cent  •  Get Rich or Die Tryin",
@@ -432,12 +936,12 @@ public static class QuoteService
         },
         new QuoteItem
         {
-            Id = 3,
+            Id = 26,
             Type = "Saying",
-            QuoteText = "A fish with its mouth shut avoids the hook",
+            QuoteText = "The best time to plant a tree was 20 years ago. The second best time is now.",
             AuthorLine = "",
             MeaningHeading = "Origin & Cultural Meaning",
-            MeaningText = "Silence and careful speech protect you from unnecessary trouble."
+            MeaningText = "Do not waste energy lamenting lost time; begin building what matters today."
         }
     ];
 }

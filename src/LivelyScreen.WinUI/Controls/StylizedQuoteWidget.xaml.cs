@@ -1,3 +1,4 @@
+using LivelyScreen.Models;
 using System;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -64,6 +65,9 @@ public sealed partial class StylizedQuoteWidget : UserControl
 
     public static readonly DependencyProperty ShowMeaningProperty =
         DependencyProperty.Register(nameof(ShowMeaning), typeof(bool), typeof(StylizedQuoteWidget), new PropertyMetadata(true, OnContentToggleChanged));
+
+    public static readonly DependencyProperty QuoteSourceTypeProperty =
+        DependencyProperty.Register(nameof(QuoteSourceType), typeof(QuoteSourceType), typeof(StylizedQuoteWidget), new PropertyMetadata(QuoteSourceType.SqliteDatabase, OnDatabasePathChanged));
 
     public static readonly DependencyProperty DatabasePathProperty =
         DependencyProperty.Register(nameof(DatabasePath), typeof(string), typeof(StylizedQuoteWidget), new PropertyMetadata(string.Empty, OnDatabasePathChanged));
@@ -165,6 +169,12 @@ public sealed partial class StylizedQuoteWidget : UserControl
     {
         get => (bool)GetValue(ShowMeaningProperty);
         set => SetValue(ShowMeaningProperty, value);
+    }
+
+    public QuoteSourceType QuoteSourceType
+    {
+        get => (QuoteSourceType)GetValue(QuoteSourceTypeProperty);
+        set => SetValue(QuoteSourceTypeProperty, value);
     }
 
     public string DatabasePath
@@ -569,7 +579,7 @@ public sealed partial class StylizedQuoteWidget : UserControl
             if (_currentOpacity <= 0.08)
             {
                 _currentOpacity = 0.08;
-                ApplyQuoteToControls(QuoteService.GetNextQuote(DatabasePath));
+                ApplyQuoteToControls(QuoteService.GetNextQuote(DatabasePath, QuoteSourceType));
                 _fadingOut = false;
             }
             ContentGrid.Opacity = _currentOpacity;
@@ -594,9 +604,9 @@ public sealed partial class StylizedQuoteWidget : UserControl
         {
             if (forceReload)
             {
-                QuoteService.EnsureQuotesLoaded(DatabasePath, true);
+                QuoteService.EnsureQuotesLoaded(DatabasePath, QuoteSourceType, true);
             }
-            var item = QuoteService.GetNextQuote(DatabasePath);
+            var item = QuoteService.GetNextQuote(DatabasePath, QuoteSourceType);
             ApplyQuoteToControls(item);
             if (ContentGrid != null)
             {

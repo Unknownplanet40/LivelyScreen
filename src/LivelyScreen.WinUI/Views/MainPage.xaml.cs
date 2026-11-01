@@ -285,7 +285,11 @@ public sealed partial class MainPage : Page
             _settingsService.Save();
         }
         ToggleQuoteWidget.IsOn = s.QuoteWidgetEnabled;
-        TxtQuoteDbPath.Text = s.QuoteDatabasePath ?? string.Empty;
+        if (ComboQuoteSourceType != null) ComboQuoteSourceType.SelectedIndex = (int)s.QuoteSource;
+        if (TxtQuoteDbPath != null) TxtQuoteDbPath.Text = s.QuoteDatabasePath ?? string.Empty;
+        if (TxtQuoteJsonPath != null) TxtQuoteJsonPath.Text = s.QuoteLocalJsonPath ?? string.Empty;
+        if (TxtQuoteOnlineUrl != null) TxtQuoteOnlineUrl.Text = s.QuoteOnlineUrl ?? string.Empty;
+        UpdateQuoteSourceVisibility();
 
         if (ComboQuoteColorTheme != null)
         {
@@ -373,7 +377,8 @@ public sealed partial class MainPage : Page
             0 => 4,
             _ => 1
         };
-        UpdateQuoteDbStatusUI(s.QuoteDatabasePath);
+        var (initPath, initType) = GetCurrentQuoteSourceInfo();
+        UpdateQuoteDbStatusUI(initPath, initType);
 
         UpdateAllWidgetPositionPreviews();
         UpdateMiniMonitorWallpaper();
@@ -1605,12 +1610,27 @@ public sealed partial class MainPage : Page
 
         // Wisdom & Quotes Settings
         if (ToggleQuoteWidget != null) s.QuoteWidgetEnabled = ToggleQuoteWidget.IsOn;
+        if (ComboQuoteSourceType != null && ComboQuoteSourceType.SelectedIndex >= 0)
+            s.QuoteSource = (QuoteSourceType)ComboQuoteSourceType.SelectedIndex;
         if (TxtQuoteDbPath != null)
         {
             s.QuoteDatabasePath = string.IsNullOrWhiteSpace(TxtQuoteDbPath.Text)
                 ? string.Empty
                 : TxtQuoteDbPath.Text.Trim().Trim('"');
         }
+        if (TxtQuoteJsonPath != null)
+        {
+            s.QuoteLocalJsonPath = string.IsNullOrWhiteSpace(TxtQuoteJsonPath.Text)
+                ? string.Empty
+                : TxtQuoteJsonPath.Text.Trim().Trim('"');
+        }
+        if (TxtQuoteOnlineUrl != null)
+        {
+            s.QuoteOnlineUrl = string.IsNullOrWhiteSpace(TxtQuoteOnlineUrl.Text)
+                ? string.Empty
+                : TxtQuoteOnlineUrl.Text.Trim();
+        }
+        UpdateQuoteSourceVisibility();
         if (ComboQuoteColorTheme != null)
         {
             s.QuoteColorTheme = ComboQuoteColorTheme.SelectedIndex switch
@@ -1692,7 +1712,8 @@ public sealed partial class MainPage : Page
                 _ => 30
             };
         }
-        UpdateQuoteDbStatusUI(s.QuoteDatabasePath);
+        var (savedPath, savedType) = GetCurrentQuoteSourceInfo();
+        UpdateQuoteDbStatusUI(savedPath, savedType);
 
         UpdateControlStates();
         UpdateAllWidgetPositionPreviews();
@@ -1742,11 +1763,17 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void UpdateQuoteDbStatusUI(string? dbPath, bool forceReload = false)
+    private void UpdateQuoteDbStatusUI(string? dbPath, bool forceReload)
+    {
+        var (_, type) = GetCurrentQuoteSourceInfo();
+        UpdateQuoteDbStatusUI(dbPath, type, forceReload);
+    }
+
+    private void UpdateQuoteDbStatusUI(string? dbPath, QuoteSourceType sourceType = QuoteSourceType.SqliteDatabase, bool forceReload = false)
     {
         try
         {
-            QuoteService.EnsureQuotesLoaded(dbPath, forceReload);
+            QuoteService.EnsureQuotesLoaded(dbPath, sourceType, forceReload);
             if (TxtQuoteDbStatus != null)
             {
                 TxtQuoteDbStatus.Text = QuoteService.LastStatusMessage;
@@ -1798,8 +1825,8 @@ public sealed partial class MainPage : Page
 
     private void OnNextQuotePreviewClicked(object sender, RoutedEventArgs e)
     {
-        var dbPath = _settingsService?.Current?.QuoteDatabasePath;
-        UpdateQuoteDbStatusUI(dbPath, true);
+        var (path, type) = GetCurrentQuoteSourceInfo();
+        UpdateQuoteDbStatusUI(path, type, true);
         LivePreviewQuoteCard?.ShowNextQuoteImmediate(true);
         MiniPreviewQuoteWidget?.ShowNextQuoteImmediate(true);
     }
@@ -2396,7 +2423,9 @@ public sealed partial class MainPage : Page
             LivePreviewQuoteCard.ShowCategoryHeader = s.QuoteShowCategoryHeader;
             LivePreviewQuoteCard.ShowAuthor = s.QuoteShowAuthor;
             LivePreviewQuoteCard.ShowMeaning = s.QuoteShowMeaning;
-            LivePreviewQuoteCard.DatabasePath = s.QuoteDatabasePath ?? string.Empty;
+            var (currQuotePath, currQuoteType) = GetCurrentQuoteSourceInfo();
+            LivePreviewQuoteCard.QuoteSourceType = currQuoteType;
+            LivePreviewQuoteCard.DatabasePath = currQuotePath;
             LivePreviewQuoteCard.RotationIntervalSeconds = s.QuoteRotationIntervalSeconds;
         }
 
@@ -2422,7 +2451,9 @@ public sealed partial class MainPage : Page
             MiniPreviewQuoteWidget.ShowCategoryHeader = s.QuoteShowCategoryHeader;
             MiniPreviewQuoteWidget.ShowAuthor = s.QuoteShowAuthor;
             MiniPreviewQuoteWidget.ShowMeaning = s.QuoteShowMeaning;
-            MiniPreviewQuoteWidget.DatabasePath = s.QuoteDatabasePath ?? string.Empty;
+            var (miniQuotePath, miniQuoteType) = GetCurrentQuoteSourceInfo();
+            MiniPreviewQuoteWidget.QuoteSourceType = miniQuoteType;
+            MiniPreviewQuoteWidget.DatabasePath = miniQuotePath;
             MiniPreviewQuoteWidget.RotationIntervalSeconds = s.QuoteRotationIntervalSeconds;
             MiniPreviewQuoteWidget.Visibility = quoteOn ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -2903,6 +2934,56 @@ public sealed partial class MainPage : Page
         {
             ComboAutoBlackoutSleepMode.IsEnabled = prerequisitesMet && (ToggleAutoBlackoutSleep?.IsOn ?? false);
         }
+    }
+
+    private void UpdateQuoteSourceVisibility()
+    {
+        int idx = ComboQuoteSourceType?.SelectedIndex ?? 0;
+        if (CardQuoteDbSource != null) CardQuoteDbSource.Visibility = idx == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (CardQuoteJsonSource != null) CardQuoteJsonSource.Visibility = idx == 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (CardQuoteOnlineSource != null) CardQuoteOnlineSource.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private (string path, QuoteSourceType type) GetCurrentQuoteSourceInfo()
+    {
+        var s = _settingsService?.Current;
+        var type = s?.QuoteSource ?? QuoteSourceType.SqliteDatabase;
+        string path = type switch
+        {
+            QuoteSourceType.LocalJson => s?.QuoteLocalJsonPath ?? "",
+            QuoteSourceType.OnlineUrl => s?.QuoteOnlineUrl ?? "",
+            _ => s?.QuoteDatabasePath ?? ""
+        };
+        return (path, type);
+    }
+
+    private void OnBrowseQuoteJsonClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        var filter = "JSON Files (*.json)\0*.json\0All Files (*.*)\0*.*\0\0";
+        var filePath = NativeMethods.PickFile(_windowHandle, "Select Quotes JSON File", filter);
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            if (TxtQuoteJsonPath != null) TxtQuoteJsonPath.Text = filePath;
+            _settingsService.Current.QuoteLocalJsonPath = filePath;
+            _settingsService.Save();
+            UpdateQuoteDbStatusUI(filePath, QuoteSourceType.LocalJson, true);
+            LivePreviewQuoteCard?.ShowNextQuoteImmediate(true);
+            MiniPreviewQuoteWidget?.ShowNextQuoteImmediate(true);
+            UpdateAllWidgetPositionPreviews();
+        }
+    }
+
+    private void OnSyncOnlineQuotesClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        string url = TxtQuoteOnlineUrl?.Text?.Trim() ?? "";
+        _settingsService.Current.QuoteOnlineUrl = url;
+        _settingsService.Save();
+        UpdateQuoteDbStatusUI(url, QuoteSourceType.OnlineUrl, true);
+        LivePreviewQuoteCard?.ShowNextQuoteImmediate(true);
+        MiniPreviewQuoteWidget?.ShowNextQuoteImmediate(true);
+        UpdateAllWidgetPositionPreviews();
     }
 
 }

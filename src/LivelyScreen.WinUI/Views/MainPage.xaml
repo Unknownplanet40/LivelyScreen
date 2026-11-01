@@ -1150,8 +1150,17 @@
                                     </Grid>
                                 </labs:SettingsCard>
 
+                                <!-- Quote Source Type Selector -->
+                                <labs:SettingsCard Header="Quote Source Type" Description="Choose where quotes and sayings are loaded from (SQLite, Local JSON, or Web URL).">
+                                    <ComboBox x:Name="ComboQuoteSourceType" SelectionChanged="OnSettingChanged" Width="260">
+                                        <ComboBoxItem Content="SQLite Database (.db)"/>
+                                        <ComboBoxItem Content="Local JSON File (.json)"/>
+                                        <ComboBoxItem Content="Online URL (HTTPS)"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
                                 <!-- KnowledgeBase SQLite Source Path -->
-                                <labs:SettingsCard Header="KnowledgeBase Source Location" Description="Path to your brain.db file or KnowledgeBase-Quotes folder. Can be relocated anytime.">
+                                <labs:SettingsCard x:Name="CardQuoteDbSource" Header="KnowledgeBase SQLite Location" Description="Path to your brain.db file or KnowledgeBase-Quotes folder.">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBox x:Name="TxtQuoteDbPath"
                                                  Width="260"
@@ -1172,6 +1181,44 @@
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <FontIcon Glyph="&#xE8B7;" FontSize="12"/>
                                                 <TextBlock Text="Folder"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Local JSON Source Path -->
+                                <labs:SettingsCard x:Name="CardQuoteJsonSource" Header="Local JSON Quotes File" Description="Path to a custom .json file containing quotes or sayings." Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBox x:Name="TxtQuoteJsonPath"
+                                                 Width="260"
+                                                 TextChanged="OnSettingChanged"
+                                                 PlaceholderText="Path to quotes JSON file (.json)..."
+                                                 ToolTipService.ToolTip="Full path to quotes .json file"/>
+                                        <Button x:Name="BtnBrowseQuoteJson"
+                                                Click="OnBrowseQuoteJsonClicked"
+                                                ToolTipService.ToolTip="Select a JSON file">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8E5;" FontSize="12"/>
+                                                <TextBlock Text="Browse .json"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Online URL Source Path -->
+                                <labs:SettingsCard x:Name="CardQuoteOnlineSource" Header="Online Quotes URL" Description="HTTPS URL returning raw JSON quotes (e.g., GitHub raw or REST API)." Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBox x:Name="TxtQuoteOnlineUrl"
+                                                 Width="260"
+                                                 TextChanged="OnSettingChanged"
+                                                 PlaceholderText="https://example.com/quotes.json"
+                                                 ToolTipService.ToolTip="HTTPS web URL returning quotes in JSON format"/>
+                                        <Button x:Name="BtnSyncOnlineQuotes"
+                                                Click="OnSyncOnlineQuotesClicked"
+                                                ToolTipService.ToolTip="Download and sync quotes from this URL immediately">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE895;" FontSize="12"/>
+                                                <TextBlock Text="Sync Now"/>
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>

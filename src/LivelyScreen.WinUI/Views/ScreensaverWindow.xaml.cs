@@ -1284,7 +1284,13 @@ public sealed partial class ScreensaverWindow : Window
                 QuoteWidgetControl.ShowCategoryHeader = s.QuoteShowCategoryHeader;
                 QuoteWidgetControl.ShowAuthor = s.QuoteShowAuthor;
                 QuoteWidgetControl.ShowMeaning = s.QuoteShowMeaning;
-                QuoteWidgetControl.DatabasePath = s.QuoteDatabasePath;
+                QuoteWidgetControl.QuoteSourceType = s.QuoteSource;
+                QuoteWidgetControl.DatabasePath = s.QuoteSource switch
+                {
+                    QuoteSourceType.LocalJson => s.QuoteLocalJsonPath,
+                    QuoteSourceType.OnlineUrl => s.QuoteOnlineUrl,
+                    _ => s.QuoteDatabasePath
+                };
                 QuoteWidgetControl.RotationIntervalSeconds = s.QuoteRotationIntervalSeconds;
                 ApplyElementPosition(QuoteWidgetControl, profile.QuotePosition);
                 QuoteWidgetControl.Visibility = Visibility.Visible;
