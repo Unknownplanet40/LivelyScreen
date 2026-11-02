@@ -3769,9 +3769,9 @@ public sealed partial class MainPage : Page
                             ExpanderReleaseNotes.Visibility = Visibility.Visible;
                             ExpanderReleaseNotes.Header = $"What's new in {rel.TagName}";
                         }
-                        if (TxtReleaseChangelog != null)
+                        if (RichReleaseChangelog != null)
                         {
-                            TxtReleaseChangelog.Text = GetChangelogForVersion(rel.TagName, rel.Changelog);
+                            RenderFormattedReleaseNotes(RichReleaseChangelog, GetChangelogForVersion(rel.TagName, rel.Changelog));
                         }
                     }
 
@@ -4005,6 +4005,141 @@ public sealed partial class MainPage : Page
         catch { }
 
         return !string.IsNullOrWhiteSpace(remoteChangelog) ? remoteChangelog : "No release notes provided.";
+    }
+
+    private static void RenderFormattedReleaseNotes(RichTextBlock target, string rawMarkdown)
+    {
+        target.Blocks.Clear();
+        if (string.IsNullOrWhiteSpace(rawMarkdown)) return;
+
+        var lines = rawMarkdown.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+        foreach (var line in lines)
+        {
+            string trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+
+            var paragraph = new Microsoft.UI.Xaml.Documents.Paragraph();
+
+            if (trimmed.StartsWith("### "))
+            {
+                // Section Header (e.g. Added, Fixed, Changed)
+                paragraph.Margin = new Thickness(0, 10, 0, 4);
+                paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run
+                {
+                    Text = trimmed[4..].Trim(),
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    FontSize = 14
+                });
+            }
+            else if (trimmed.StartsWith("## "))
+            {
+                // Main Header
+                paragraph.Margin = new Thickness(0, 12, 0, 6);
+                paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run
+                {
+                    Text = trimmed[3..].Trim(),
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    FontSize = 15
+                });
+            }
+            else if (trimmed.StartsWith("- ") || trimmed.StartsWith("* "))
+            {
+                // Bullet Item
+                paragraph.Margin = new Thickness(12, 2, 0, 4);
+                paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run
+                {
+                    Text = "•  ",
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                });
+
+                string content = trimmed[2..].Trim();
+                ParseMarkdownInlines(paragraph, content);
+            }
+            else
+            {
+                // Plain paragraph
+                paragraph.Margin = new Thickness(0, 2, 0, 4);
+                ParseMarkdownInlines(paragraph, trimmed);
+            }
+
+            target.Blocks.Add(paragraph);
+        }
+    }
+
+    private static void ParseMarkdownInlines(Microsoft.UI.Xaml.Documents.Paragraph paragraph, string text)
+    {
+        // Simple inline parser for **bold** and `code` spans
+        int idx = 0;
+        while (idx < text.Length)
+        {
+            int nextBold = text.IndexOf("**", idx, StringComparison.Ordinal);
+            int nextCode = text.IndexOf('`', idx);
+
+            int nextToken = -1;
+            int tokenType = 0; // 1 = bold, 2 = code
+
+            if (nextBold >= 0 && (nextCode < 0 || nextBold < nextCode))
+            {
+                nextToken = nextBold;
+                tokenType = 1;
+            }
+            else if (nextCode >= 0)
+            {
+                nextToken = nextCode;
+                tokenType = 2;
+            }
+
+            if (nextToken < 0)
+            {
+                // Trailing text
+                paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = text[idx..] });
+                break;
+            }
+
+            if (nextToken > idx)
+            {
+                paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = text[idx..nextToken] });
+            }
+
+            if (tokenType == 1)
+            {
+                int closingBold = text.IndexOf("**", nextToken + 2, StringComparison.Ordinal);
+                if (closingBold > nextToken + 2)
+                {
+                    string boldContent = text.Substring(nextToken + 2, closingBold - nextToken - 2);
+                    paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run
+                    {
+                        Text = boldContent,
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
+                    });
+                    idx = closingBold + 2;
+                }
+                else
+                {
+                    paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = "**" });
+                    idx = nextToken + 2;
+                }
+            }
+            else if (tokenType == 2)
+            {
+                int closingCode = text.IndexOf('`', nextToken + 1);
+                if (closingCode > nextToken + 1)
+                {
+                    string codeContent = text.Substring(nextToken + 1, closingCode - nextToken - 1);
+                    paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run
+                    {
+                        Text = codeContent,
+                        FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Cascadia Mono, Consolas")
+                    });
+                    idx = closingCode + 1;
+                }
+                else
+                {
+                    paragraph.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = "`" });
+                    idx = nextToken + 1;
+                }
+            }
+        }
     }
 
 }

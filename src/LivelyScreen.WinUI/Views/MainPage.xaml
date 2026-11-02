@@ -2454,8 +2454,8 @@
                             </labs:SettingsExpander.HeaderIcon>
                             <labs:SettingsExpander.Items>
                                 <labs:SettingsCard HorizontalContentAlignment="Stretch">
-                                    <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
-                                        <TextBlock x:Name="TxtReleaseChangelog" Text="" TextWrapping="Wrap" FontFamily="Consolas, Segoe UI" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                        <RichTextBlock x:Name="RichReleaseChangelog" TextWrapping="Wrap" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </ScrollViewer>
                                 </labs:SettingsCard>
                             </labs:SettingsExpander.Items>
