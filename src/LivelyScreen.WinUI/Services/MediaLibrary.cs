@@ -50,7 +50,7 @@ public class MediaLibrary
     {
         lock (_lock)
         {
-            if (!_settingsService.Current.DynamicThemeEnabled)
+            if (!_settingsService.Current.DynamicThemeEnabled || _settingsService.Current.IsSimulationActive)
                 return null;
 
             if (_themes.Count == 0)
@@ -162,7 +162,14 @@ public class MediaLibrary
                     string glyph;
                     string countText;
 
-                    if (photoCount > 0 && videoCount == 0)
+                    bool isArtwork = ArtworkService.IsArtworkFolder(folder);
+                    if (isArtwork)
+                    {
+                        badge = "Artwork Gallery";
+                        glyph = "\uE790";
+                        countText = photoCount == 1 ? "1 artwork" : $"{photoCount} artworks";
+                    }
+                    else if (photoCount > 0 && videoCount == 0)
                     {
                         badge = "Photos";
                         glyph = "\uEB9F";
@@ -194,11 +201,12 @@ public class MediaLibrary
                         DisplayName = folderName,
                         IsAllSources = false,
                         IsDynamicTheme = false,
+                        IsArtworkGallery = isArtwork,
                         BadgeText = badge,
                         Glyph = glyph,
                         ItemCountText = countText,
                         PathText = folder,
-                        DetailsText = $"{countText} • {folder}",
+                        DetailsText = isArtwork ? $"{countText} • Captions & Credits • {folder}" : $"{countText} • {folder}",
                         IsActive = isActive,
                         Profile = _settingsService.Current.GetProfileForPath(folder)
                     });
@@ -214,9 +222,80 @@ public class MediaLibrary
         return GetMediaSources().Where(s => s.IsDynamicTheme).ToList();
     }
 
+    public List<MediaSourceItem> GetArtworkGallerySources()
+    {
+        return GetMediaSources().Where(s => s.IsArtworkGallery).ToList();
+    }
+
+    public async Task AddArtworkFolderAsync(string folderPath)
+    {
+        await ArtworkService.CreateStarterArtworkFolderAsync(folderPath);
+        if (!_settingsService.Current.MediaFolders.Contains(folderPath, StringComparer.OrdinalIgnoreCase))
+        {
+            _settingsService.Current.MediaFolders.Add(folderPath);
+            _settingsService.Save();
+        }
+        Rescan();
+    }
+
     public List<MediaSourceItem> GetStandardFolderSources()
     {
         return GetMediaSources().Where(s => !s.IsDynamicTheme && !s.IsAllSources).ToList();
+    }
+
+    public List<MediaSourceItem> GetSimulationSources()
+    {
+        var s = _settingsService.Current;
+        var activeMode = s.GetEffectiveSimulationMode();
+        string logosDir = Path.Combine(AppContext.BaseDirectory, "Assets", "Logos");
+
+        var items = new List<(SimulationModeType Mode, string Title, string Badge, string Glyph, string LogoFile, Windows.UI.Color BgColor, string MiniText, string Subtitle, string Details)>
+        {
+            (SimulationModeType.CyberOpsTerminal, "CyberOps SOC Terminal", "Hacker Simulator", "\uE756", "cyberops.png", Windows.UI.Color.FromArgb(255, 6, 18, 21), "CYBEROPS // ONLINE", "Live CPU & RAM Telemetry • Radar Map • Packet Stream", "Interactive terminal: type keys to execute recon commands"),
+            (SimulationModeType.Windows11Update, "Windows 11 System Update", "Fake OS Update", "\uE7F8", "win11.png", Windows.UI.Color.FromArgb(255, 0, 0, 0), $"You are {s.SimulationStartPercent}% there.", $"Pitch black (#000000) • \"You are {s.SimulationStartPercent}% there.\" • {s.SimulationDurationMinutes}m duration", "Press Enter for authentic Windows 11 BSOD prank screen"),
+            (SimulationModeType.Windows10Update, "Windows 10 System Update", "Fake OS Update", "\uE7F8", "win10.png", Windows.UI.Color.FromArgb(255, 0, 120, 215), $"Working on updates {s.SimulationStartPercent}%", $"Cerulean blue (#0078D7) • Official Win10 Logo • {s.SimulationDurationMinutes}m duration", "Press Enter for instant BSOD prank screen"),
+            (SimulationModeType.MacOSUpdate, "macOS Firmware Update", "Fake OS Update", "\uE977", "apple.png", Windows.UI.Color.FromArgb(255, 10, 10, 12), "macOS Update", $"Pitch black screen • Apple Logo • {s.SimulationDurationMinutes}m smooth progress bar", "Press Enter for multilingual Kernel Panic screen"),
+            (SimulationModeType.UbuntuUpdate, "Ubuntu Linux Boot / Update", "Fake OS Update", "\uE756", "ubuntu.png", Windows.UI.Color.FromArgb(255, 44, 0, 30), "ubuntu® • • • • •", $"Deep aubergine (#2C001E) • Ubuntu Circle of Friends • {s.SimulationDurationMinutes}m duration", "Press Enter for Linux Kernel Panic screen"),
+            (SimulationModeType.ChromeOSUpdate, "ChromeOS System Update", "Fake OS Update", "\uE774", "chromeos.png", Windows.UI.Color.FromArgb(255, 32, 33, 36), $"Updating ({s.SimulationStartPercent}%)", $"System update screen • Official Chrome Emblem • {s.SimulationDurationMinutes}m duration", "Press Enter for ChromeOS recovery prank screen"),
+            (SimulationModeType.RandomOSUpdate, "Random OS Update (Shuffle)", "Prank Shuffle", "\uE8B1", "random.png", Windows.UI.Color.FromArgb(255, 24, 28, 36), "Win11 / Win10 / Mac / Ubuntu", "Picks a random OS update screen each activation", "Cycles between Windows 11, Windows 10, macOS, Ubuntu & ChromeOS")
+        };
+
+        var result = new List<MediaSourceItem>();
+        foreach (var entry in items)
+        {
+            string key = AppSettings.GetSimulationSourceKey(entry.Mode);
+            bool isActive = s.IsSimulationActive && activeMode == entry.Mode;
+
+            Microsoft.UI.Xaml.Media.ImageSource? logoImg = null;
+            try
+            {
+                string logoPath = Path.Combine(logosDir, entry.LogoFile);
+                if (File.Exists(logoPath))
+                {
+                    logoImg = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(logoPath));
+                }
+            }
+            catch { }
+
+            result.Add(new MediaSourceItem
+            {
+                Path = key,
+                DisplayName = entry.Title,
+                IsAllSources = true,
+                IsDynamicTheme = false,
+                IsArtworkGallery = false,
+                BadgeText = entry.Badge,
+                Glyph = entry.Glyph,
+                PreviewBackground = new Microsoft.UI.Xaml.Media.SolidColorBrush(entry.BgColor),
+                LogoImage = logoImg,
+                PreviewSubtext = entry.MiniText,
+                ItemCountText = entry.Subtitle,
+                PathText = entry.Details,
+                DetailsText = entry.Details,
+                IsActive = isActive
+            });
+        }
+        return result;
     }
 
     public event Action? LibraryUpdated;
@@ -319,6 +398,9 @@ public class MediaLibrary
                 ReturnSpecialDirectories = false
             };
 
+            bool isArtwork = ArtworkService.IsArtworkFolder(rootFolder);
+            var artworkMeta = isArtwork ? ArtworkService.LoadFolderArtworkMetadata(rootFolder) : null;
+
             var files = Directory.EnumerateFiles(rootFolder, "*.*", options);
             foreach (var file in files)
             {
@@ -333,7 +415,12 @@ public class MediaLibrary
                 }
                 else if (ImageExtensions.Contains(ext))
                 {
-                    _items.Add(new MediaItem(file, MediaType.Image));
+                    var item = new MediaItem(file, MediaType.Image);
+                    if (isArtwork || File.Exists(Path.ChangeExtension(file, ".json")))
+                    {
+                        item.Artwork = ArtworkService.GetArtworkForFile(file, artworkMeta, isArtwork);
+                    }
+                    _items.Add(item);
                 }
             }
         }

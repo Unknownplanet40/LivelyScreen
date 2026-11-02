@@ -14,6 +14,15 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int vKey);
+
+    [DllImport("user32.dll")]
+    public static extern int ShowCursor(bool bShow);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr SetCursor(IntPtr hCursor);
+
     public enum QUERY_USER_NOTIFICATION_STATE
     {
         QUNS_NOT_PRESENT = 1,

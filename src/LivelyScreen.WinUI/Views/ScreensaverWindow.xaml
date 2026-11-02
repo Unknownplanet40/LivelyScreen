@@ -12,7 +12,9 @@
     <Grid x:Name="RootWindowGrid" Background="Black" Opacity="0"
           FocusVisualPrimaryThickness="0"
           FocusVisualSecondaryThickness="0"
-          IsTabStop="False">
+          IsTabStop="False"
+          KeyDown="OnKeyDown"
+          PreviewKeyDown="OnKeyDown">
         <!-- Layer A -->
         <Grid x:Name="LayerA" Opacity="1">
             <Grid.RenderTransform>
@@ -69,6 +71,44 @@
             </StackPanel>
         </Border>
 
+        <!-- Museum Gallery Artwork Plaque Overlay -->
+        <Border x:Name="BorderArtworkPlaque"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Margin="48,0,0,40"
+                Background="#D010131A"
+                BorderBrush="#35FFFFFF"
+                BorderThickness="1"
+                CornerRadius="10"
+                Padding="16,10,18,10"
+                MaxWidth="560"
+                Opacity="0"
+                Visibility="Collapsed"
+                IsHitTestVisible="False">
+            <StackPanel Spacing="3" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE790;" FontSize="12" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TxtArtworkTitle"
+                               Text=""
+                               FontFamily="Segoe UI Variable Display, Segoe UI"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Foreground="#FFFFFF"
+                               TextWrapping="NoWrap"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock x:Name="TxtArtworkCredit"
+                           Text=""
+                           FontFamily="Segoe UI Variable Text, Segoe UI"
+                           FontSize="11.5"
+                           Foreground="#A0FFFFFF"
+                           Margin="20,0,0,0"
+                           TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+        </Border>
+
         <!-- OLED Protected Widgets Container with Dynamic Pixel-Shift Transform -->
         <Grid x:Name="OledShiftContainer" IsHitTestVisible="False">
             <Grid.RenderTransform>
@@ -121,6 +161,11 @@
                 <StackPanel x:Name="ZoneStackBottomRight" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,56,48"/>
             </Grid>
         </Grid>
+
+        <!-- Fake OS Updates & CyberOps Simulation Suite Layer -->
+        <controls:SimulationSuiteControl x:Name="SimulationOverlayControl"
+                                         Visibility="Collapsed"
+                                         IsHitTestVisible="False"/>
 
         <!-- Second-Stage Auto-Blackout Scrim Overlay -->
         <Grid x:Name="BlackoutScrim" Background="Black" Opacity="0" IsHitTestVisible="False" Visibility="Collapsed"/>

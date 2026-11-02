@@ -160,6 +160,18 @@
                             <ComboBox x:Name="ComboTargetDisplay" SelectionChanged="OnTargetDisplayChanged" Width="280"/>
                         </labs:SettingsCard>
 
+                        <labs:SettingsCard x:Name="CardPowerOffInactiveDisplays" Header="Power Off Inactive Displays" Description="Put inactive monitors into hardware standby via DDC/CI instead of displaying a black screen.">
+                            <ToggleSwitch x:Name="TogglePowerOffInactiveDisplays" Toggled="OnSettingChanged" OnContent="Power Off (Standby)" OffContent="Blank Screen"/>
+                        </labs:SettingsCard>
+
+                        <!-- DDC/CI HARDWARE SUPPORT STATUS -->
+                        <Border x:Name="PanelDdcCiStatus" Visibility="Collapsed" Margin="0,-2,0,0" Padding="14,10" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <FontIcon x:Name="IconDdcCiStatus" Glyph="&#xE73E;" FontSize="14" Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+                                <TextBlock x:Name="TxtDdcCiStatus" Text="Probing DDC/CI hardware support..." Style="{StaticResource CaptionTextBlockStyle}" VerticalAlignment="Center" TextWrapping="WrapWholeWords"/>
+                            </StackPanel>
+                        </Border>
+
                         <labs:SettingsCard x:Name="CardDisplayMode" Header="Multi-Monitor Display Mode" Description="Choose how media is distributed across multiple screens (Only active when All Displays is selected).">
                             <ComboBox x:Name="ComboDisplayMode" SelectionChanged="OnSettingChanged" Width="240">
                                 <ComboBoxItem Content="Independent (Separate items)"/>
@@ -198,6 +210,24 @@
                                 <!-- Right: Actions Group -->
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                     <Button Content="+ Add Folder" Click="OnAddFolderClicked" Style="{StaticResource AccentButtonStyle}" ToolTipService.ToolTip="Add standard media folder with photos and videos"/>
+                                    <SplitButton Content="🎨 Artwork Gallery"
+                                                 Click="OnArtworkSplitButtonClicked"
+                                                 ToolTipService.ToolTip="Manage artworks, view captions &amp; credits, or add new artwork">
+                                        <SplitButton.Flyout>
+                                            <MenuFlyout>
+                                                <MenuFlyoutItem Text="Manage Artworks" Click="OnOpenManageArtworksClicked">
+                                                    <MenuFlyoutItem.Icon>
+                                                        <FontIcon Glyph="&#xE70F;"/>
+                                                    </MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                                <MenuFlyoutItem Text="Add New Artwork" Click="OnAddArtworkFolderClicked">
+                                                    <MenuFlyoutItem.Icon>
+                                                        <FontIcon Glyph="&#xE710;"/>
+                                                    </MenuFlyoutItem.Icon>
+                                                </MenuFlyoutItem>
+                                            </MenuFlyout>
+                                        </SplitButton.Flyout>
+                                    </SplitButton>
                                     <Button Content="Import Theme" Click="OnImportThemeClicked" ToolTipService.ToolTip="Import dynamic wallpaper theme (.lsdt, .zip, theme.json)"/>
 
                                     <Border Width="1" Height="18" Background="{ThemeResource DividerStrokeColorDefaultBrush}" Margin="2,0"/>
@@ -563,15 +593,25 @@
                                                             <ColumnDefinition Width="*"/>
                                                         </Grid.ColumnDefinitions>
 
-                                                        <Button Grid.Column="0"
-                                                                Tag="{Binding Path}"
-                                                                Click="OnSourceEffectsClicked"
-                                                                ToolTipService.ToolTip="Configure transitions &amp; effects for this folder">
-                                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                                <FontIcon Glyph="&#xE790;" FontSize="12"/>
-                                                                <TextBlock Text="Transitions &amp; Effects" FontSize="12"/>
-                                                            </StackPanel>
-                                                        </Button>
+                                                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6">
+                                                            <Button Tag="{Binding Path}"
+                                                                    Click="OnSourceEffectsClicked"
+                                                                    ToolTipService.ToolTip="Configure transitions &amp; effects for this folder">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <FontIcon Glyph="&#xE790;" FontSize="12"/>
+                                                                    <TextBlock Text="Transitions &amp; Effects" FontSize="12"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                            <Button Tag="{Binding Path}"
+                                                                    Click="OnManageArtworksFromCardClicked"
+                                                                    Visibility="{Binding ArtworkManageVisibility}"
+                                                                    ToolTipService.ToolTip="View and edit captions &amp; credits for artworks in this gallery">
+                                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                                    <FontIcon Glyph="&#xE70F;" FontSize="12"/>
+                                                                    <TextBlock Text="Manage Artworks" FontSize="12"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </StackPanel>
 
                                                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
                                                             <Button Content="{Binding ActionButtonText}"
@@ -599,6 +639,295 @@
                                         <ComboBoxItem Content="Date Modified (Newest first)"/>
                                     </ComboBox>
                                 </labs:SettingsCard>
+                            </StackPanel>
+                        </Expander>
+
+                        <!-- CATEGORY 3: FAKE OS UPDATES & SIMULATION SUITE -->
+                        <Expander x:Name="ExpanderSimulationSuite" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Expander.Header>
+                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <TextBlock Text="Fake OS Updates &amp; Simulation Suite" FontWeight="SemiBold" FontSize="15"/>
+                                        <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                            <TextBlock x:Name="TxtSimulationBadge" Text="7 Modes" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock Text="Official OS update screens (Windows 11/10, macOS, Ubuntu, ChromeOS) &amp; CyberOps SOC Terminal. Suppresses widgets when active." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <ListView x:Name="ListSimulationSources" SelectionMode="None" MaxHeight="380" IsItemClickEnabled="False">
+                                    <ListView.ItemContainerStyle>
+                                        <Style TargetType="ListViewItem">
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                            <Setter Property="Padding" Value="0,2"/>
+                                            <Setter Property="MinHeight" Value="0"/>
+                                        </Style>
+                                    </ListView.ItemContainerStyle>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,2"
+                                                    Padding="12,10"
+                                                    CornerRadius="8"
+                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="1"
+                                                    HorizontalAlignment="Stretch">
+                                                <Grid ColumnSpacing="14">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <!-- 16:9 Mini OS Preview Screen with Official Brand Logo -->
+                                                    <Border Grid.Column="0"
+                                                            Width="112" Height="64"
+                                                            CornerRadius="6"
+                                                            Background="{Binding PreviewBackground}"
+                                                            BorderBrush="#38FFFFFF"
+                                                            BorderThickness="1"
+                                                            VerticalAlignment="Center">
+                                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                                                            <Image Source="{Binding LogoImage}" Width="24" Height="24" HorizontalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding PreviewSubtext}"
+                                                                       FontSize="8.5"
+                                                                       Foreground="#E0FFFFFF"
+                                                                       HorizontalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis"
+                                                                       MaxWidth="100"/>
+                                                        </StackPanel>
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="2,0">
+                                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                            <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2" VerticalAlignment="Center">
+                                                                <TextBlock Text="{Binding BadgeText}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                        <TextBlock Text="{Binding ItemCountText}" FontSize="12" FontWeight="Medium" Foreground="{ThemeResource TextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding PathText}" FontSize="11.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+
+                                                    <Button Grid.Column="2"
+                                                            Content="{Binding ActionButtonText}"
+                                                            Tag="{Binding Path}"
+                                                            Click="OnSetSourceActiveClicked"
+                                                            IsEnabled="{Binding CanSetActive}"
+                                                            VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+
+                                <!-- whitescreen.im-Style Simulation Control Panel Card -->
+                                <Border CornerRadius="8"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        Padding="18,16"
+                                        HorizontalAlignment="Stretch">
+                                    <StackPanel Spacing="14">
+                                        <!-- 1. Start from (0% - 99% Slider) -->
+                                        <StackPanel Spacing="4">
+                                            <Grid>
+                                                <TextBlock Text="Start from" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="TxtSimStartPercent"
+                                                           Text="7%"
+                                                           FontWeight="SemiBold"
+                                                           FontSize="14"
+                                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+                                            <Slider x:Name="SliderSimStartPercent"
+                                                    Minimum="0"
+                                                    Maximum="99"
+                                                    StepFrequency="1"
+                                                    Value="7"
+                                                    ValueChanged="OnSettingChanged"/>
+                                        </StackPanel>
+
+                                        <!-- 2. Duration (Preset Pills + Custom Input) -->
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Duration" FontWeight="SemiBold" FontSize="14"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button x:Name="BtnDur1m" Content="1 min" Tag="1" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDur5m" Content="5 min" Tag="5" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDur15m" Content="15 min" Tag="15" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDur30m" Content="30 min" Tag="30" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDur60m" Content="60 min" Tag="60" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDurCustom" Content="Custom" Tag="custom" Click="OnSimDurationPresetClicked" CornerRadius="14" Padding="14,6"/>
+
+                                                <StackPanel x:Name="PanelSimCustomDuration" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Visibility="Collapsed" Margin="4,0,0,0">
+                                                    <TextBox x:Name="TxtSimCustomMinutes"
+                                                             Width="72"
+                                                             PlaceholderText="42"
+                                                             Text="42"
+                                                             TextChanged="OnSimCustomMinutesTextChanged"/>
+                                                    <TextBlock Text="min" VerticalAlignment="Center" FontSize="12.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- 3. Start delay (Now / 5 sec / 10 sec) -->
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="Start delay" FontWeight="SemiBold" FontSize="14"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button x:Name="BtnDelayNow" Content="Now" Tag="0" Click="OnSimDelayPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDelay5s" Content="5 sec" Tag="5" Click="OnSimDelayPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                                <Button x:Name="BtnDelay10s" Content="10 sec" Tag="10" Click="OnSimDelayPresetClicked" CornerRadius="14" Padding="14,6"/>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <!-- 4. Bottom Row: Live Schedule Summary & Restart Button -->
+                                        <Grid Margin="0,2,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="TxtSimScheduleSummary"
+                                                       Grid.Column="0"
+                                                       Text="7% → 100% over 15 min"
+                                                       FontSize="12"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <Button x:Name="BtnSimRestartPreview"
+                                                    Grid.Column="1"
+                                                    Click="OnSimRestartPreviewClicked"
+                                                    Style="{StaticResource AccentButtonStyle}"
+                                                    CornerRadius="14"
+                                                    Padding="16,6"
+                                                    ToolTipService.ToolTip="Launch or restart the OS update simulation right now">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE72C;" FontSize="12"/>
+                                                    <TextBlock Text="Restart" FontSize="12.5" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <labs:SettingsCard x:Name="CardSimSpinnerSpeed" Header="Circular Spinner Speed (Windows 11 &amp; 10)" Description="Rotation speed for the 6-dot circular arc spinner (1.0s–1.3s recommended).">
+                                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                        <Slider x:Name="SliderSimSpinnerSpeed"
+                                                Minimum="0.6"
+                                                Maximum="3.0"
+                                                StepFrequency="0.05"
+                                                Value="1.75"
+                                                Width="180"
+                                                ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtSimSpinnerSpeed"
+                                                   Text="1.75s / rot"
+                                                   Width="70"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <labs:SettingsCard x:Name="CardSimMultiMonitorMode" Header="Multi-Monitor Mode (MULTI_MONITOR_MODE)" Description="Primary Monitor Only shows the fake OS screen on the primary display with pure black secondary monitors. Mirror shows the exact same synchronized screen centered and scaled on every monitor.">
+                                    <ComboBox x:Name="ComboSimMultiMonitorMode" SelectionChanged="OnSettingChanged" Width="300">
+                                        <ComboBoxItem Content="Primary Monitor Only (primary_only)" Tag="primary_only"/>
+                                        <ComboBoxItem Content="Mirror Across All Monitors (mirror)" Tag="mirror"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <labs:SettingsCard x:Name="CardSimMaskSensitive" Header="Mask Sensitive Info (MASK_SENSITIVE)" Description="Masks hostname (HOST-****), user (****), MAC address (xx:xx:xx), and the last two IPv4 octets (192.168.x.x) in the SOC / System Monitor dashboard.">
+                                    <ToggleSwitch x:Name="ToggleSimMaskSensitive" OnContent="Enabled" OffContent="Disabled" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <labs:SettingsCard x:Name="CardSimWhenFinished" Header="When Update Reaches 100%" Description="Choose what happens when the update timer completes.">
+                                    <ComboBox x:Name="ComboSimWhenFinished" SelectionChanged="OnSettingChanged" Width="280">
+                                        <ComboBoxItem Content="Simulated Reboot &amp; Loop (Shows OS Logo)"/>
+                                        <ComboBoxItem Content="Freeze at 99% (Eternal Wait)"/>
+                                        <ComboBoxItem Content="Complete at 100% &amp; Hold"/>
+                                        <ComboBoxItem Content="Exit Screensaver Automatically"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <labs:SettingsCard x:Name="CardSimEnterBsod" Header="Prank BSOD on Enter Key (Auto Crash-Reboot at 100%)" Description="Pressing Enter triggers an authentic Windows 10/11 BSOD with QR code, climbs to 100%, black-screens for 2s, and returns.">
+                                    <ToggleSwitch x:Name="ToggleSimEnterBsod" OnContent="Enabled" OffContent="Disabled" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+
+                                <!-- BSOD Stop Code & Messages Customization Card -->
+                                <Border CornerRadius="8"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        Padding="18,14"
+                                        HorizontalAlignment="Stretch">
+                                    <StackPanel Spacing="10">
+                                        <Grid>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="BSOD Stop Code &amp; Custom Text" FontWeight="SemiBold" FontSize="14"/>
+                                                <TextBlock Text="Customize the BSOD Stop Code, crash messages, or override the Windows 10/11 update text ({0} = live %)." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            </StackPanel>
+                                            <Button Content="Reset Text Defaults" Click="OnSimResetCustomTextsClicked" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12"/>
+                                        </Grid>
+
+                                        <Grid ColumnSpacing="12" RowSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="BSOD Stop Code:" VerticalAlignment="Center" FontSize="12.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                                <ComboBox x:Name="ComboSimBsodStopCode" SelectionChanged="OnSimBsodStopCodeComboChanged" Width="260">
+                                                    <ComboBoxItem Content="CRITICAL_PROCESS_DIED"/>
+                                                    <ComboBoxItem Content="SYSTEM_SERVICE_EXCEPTION"/>
+                                                    <ComboBoxItem Content="IRQL_NOT_LESS_OR_EQUAL"/>
+                                                    <ComboBoxItem Content="MEMORY_MANAGEMENT"/>
+                                                    <ComboBoxItem Content="PAGE_FAULT_IN_NONPAGED_AREA"/>
+                                                    <ComboBoxItem Content="KERNEL_SECURITY_CHECK_FAILURE"/>
+                                                    <ComboBoxItem Content="VIDEO_TDR_FAILURE"/>
+                                                    <ComboBoxItem Content="Custom Stop Code..."/>
+                                                </ComboBox>
+                                                <TextBox x:Name="TxtSimCustomStopCode"
+                                                         PlaceholderText="CRITICAL_PROCESS_DIED"
+                                                         Width="220"
+                                                         Visibility="Collapsed"
+                                                         TextChanged="OnSimCustomTextFieldsChanged"/>
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="BSOD Message:" VerticalAlignment="Center" FontSize="12.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <TextBox x:Name="TxtSimBsodMainMsg"
+                                                     Grid.Row="1" Grid.Column="1"
+                                                     PlaceholderText="Your device ran into a problem and needs to restart."
+                                                     TextChanged="OnSimCustomTextFieldsChanged"/>
+
+                                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Update Line 1:" VerticalAlignment="Center" FontSize="12.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <TextBox x:Name="TxtSimCustomLine1"
+                                                     Grid.Row="2" Grid.Column="1"
+                                                     PlaceholderText="Leave blank for OS default (Win11: 'You are {0}% there.' | Win10: 'Working on updates {0}% complete.')"
+                                                     TextChanged="OnSimCustomTextFieldsChanged"/>
+
+                                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Update Line 2:" VerticalAlignment="Center" FontSize="12.5" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                            <Grid Grid.Row="3" Grid.Column="1" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBox x:Name="TxtSimCustomLine2"
+                                                         Grid.Column="0"
+                                                         PlaceholderText="Line 2 (e.g. Please keep your computer on.)"
+                                                         TextChanged="OnSimCustomTextFieldsChanged"/>
+                                                <TextBox x:Name="TxtSimCustomBottomText"
+                                                         Grid.Column="1"
+                                                         PlaceholderText="Bottom (e.g. Your computer may restart a few times.)"
+                                                         TextChanged="OnSimCustomTextFieldsChanged"/>
+                                            </Grid>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </Expander>
 
@@ -757,8 +1086,27 @@
                         <TextBlock Text="Screensaver Widgets &amp; Overlays" Style="{StaticResource TitleTextBlockStyle}"/>
                         <TextBlock Text="Display live time, date, and glanceable info on top of screensaver media." Style="{StaticResource BodyTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
 
+                        <!-- Simulation Suite Auto-Suppression Notice -->
+                        <Border x:Name="BannerSimWidgetsDisabled"
+                                Visibility="Collapsed"
+                                CornerRadius="8"
+                                Padding="14,10"
+                                Margin="0,8,0,0"
+                                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}"
+                                BorderBrush="{ThemeResource AccentFillColorDefaultBrush}"
+                                BorderThickness="1">
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                <TextBlock Text="Widgets are automatically disabled while the Fake OS Updates &amp; Simulation Suite is active for 100% visual authenticity."
+                                           FontSize="12.5"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Master Toggle -->
-                        <labs:SettingsCard Header="Enable Screensaver Widgets" Description="Show overlay widgets while the screensaver is running." Margin="0,12,0,0">
+                        <labs:SettingsCard x:Name="CardWidgetsEnabled" Header="Enable Screensaver Widgets" Description="Show overlay widgets while the screensaver is running." Margin="0,12,0,0">
                             <ToggleSwitch x:Name="ToggleWidgetsEnabled" Toggled="OnSettingChanged"/>
                         </labs:SettingsCard>
 
@@ -2218,5 +2566,210 @@
                 </StackPanel>
             </StackPanel>
         </ContentDialog>
+
+        <!-- ADD ARTWORK DIALOG -->
+        <ContentDialog x:Name="DialogAddArtwork"
+                       Title="Add Artwork with Captions &amp; Credits"
+                       PrimaryButtonText="Save Artwork"
+                       CloseButtonText="Cancel"
+                       DefaultButton="Primary"
+                       PrimaryButtonClick="OnSaveArtworkClicked">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="450">
+                <StackPanel Spacing="12" Width="440" Padding="0,0,12,0">
+                    <InfoBar x:Name="InfoBarArtworkStatus" IsOpen="False" Severity="Error" Margin="0,0,0,4" IsClosable="True"/>
+                <!-- Target Gallery Folder -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Target Artwork Gallery Folder" FontWeight="Medium" FontSize="13"/>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ComboArtworkTargetFolder" Grid.Column="0" HorizontalAlignment="Stretch" SelectionChanged="OnArtworkTargetFolderChanged"/>
+                        <Button Grid.Column="1" Content="Browse..." Click="OnBrowseArtworkFolderClicked" ToolTipService.ToolTip="Select or create a folder for this artwork gallery"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Artwork Image File Picker & Thumbnail Preview -->
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Artwork Image File" FontWeight="Medium" FontSize="13"/>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TxtArtworkImagePath" Grid.Column="0" PlaceholderText="Select image (JPG, PNG, WEBP, GIF)..." IsReadOnly="True"/>
+                        <Button Grid.Column="1" Content="Browse Image..." Click="OnBrowseArtworkImageClicked" Style="{StaticResource AccentButtonStyle}"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Thumbnail Preview Banner -->
+                <Border x:Name="BorderArtworkThumbnailPreview" Height="110" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" Visibility="Collapsed">
+                    <Grid>
+                        <Image x:Name="ImgArtworkThumbnailPreview" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <!-- Title / Caption -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Title / Caption" FontWeight="Medium" FontSize="13"/>
+                    <TextBox x:Name="TxtInputArtworkTitle" PlaceholderText="e.g. No help is comming"/>
+                </StackPanel>
+
+                <!-- Artist -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Artist / Creator" FontWeight="Medium" FontSize="13"/>
+                    <TextBox x:Name="TxtInputArtworkArtist" PlaceholderText="e.g. PQHAUS"/>
+                </StackPanel>
+
+                <!-- Credits (CTTO) & Year -->
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="100"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Credits / Attribution (CTTO)" FontWeight="Medium" FontSize="13"/>
+                        <TextBox x:Name="TxtInputArtworkCredit" PlaceholderText="e.g. ctto, DeviantArt, etc."/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Text="Year" FontWeight="Medium" FontSize="13"/>
+                        <TextBox x:Name="TxtInputArtworkYear" PlaceholderText="e.g. 2024"/>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+            </ScrollViewer>
+        </ContentDialog>
+
+        <!-- MANAGE GALLERY ARTWORKS DIALOG -->
+        <ContentDialog x:Name="DialogManageArtworks"
+                       Title="Manage Gallery Artworks"
+                       PrimaryButtonText="+ Add Artwork"
+                       CloseButtonText="Done"
+                       DefaultButton="Primary"
+                       PrimaryButtonClick="OnManageDialogPrimaryClicked"
+                       CloseButtonClick="OnManageDialogCloseClicked">
+            <Grid Width="450" MaxHeight="520">
+                <!-- VIEW 1: ARTWORKS LIST -->
+                <Grid x:Name="PanelManageList" RowSpacing="12" Visibility="Visible">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Gallery Selector Header -->
+                    <Grid Grid.Row="0" ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="ComboManageGallerySelector"
+                                  Header="Artwork Gallery Folder"
+                                  HorizontalAlignment="Stretch"
+                                  SelectionChanged="OnManageGallerySelectorChanged"/>
+                        <Button Grid.Column="1"
+                                VerticalAlignment="Bottom"
+                                Height="32"
+                                Padding="8,4"
+                                Click="OnOpenGalleryFolderInExplorerClicked"
+                                ToolTipService.ToolTip="Open gallery folder in File Explorer">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xED25;" FontSize="12"/>
+                                <TextBlock Text="Explorer" FontSize="11"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <TextBlock x:Name="TxtManageArtworksCount" Grid.Row="1" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Loading artworks..."/>
+
+                    <!-- Artworks ListView -->
+                    <ListView Grid.Row="2"
+                              x:Name="ListManageArtworks"
+                              SelectionMode="None"
+                              MaxHeight="360"
+                              BorderThickness="1"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              CornerRadius="8"
+                              Padding="4">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Padding" Value="0,2"/>
+                                <Setter Property="MinHeight" Value="0"/>
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="2,1,4,1" Padding="8,6" CornerRadius="6"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="50"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <!-- Thumbnail -->
+                                        <Border Grid.Column="0" Width="50" Height="50" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                            <Image Source="{Binding FullImagePath}" Stretch="UniformToFill"/>
+                                        </Border>
+
+                                        <!-- Metadata Info -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2" Margin="2,0">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding FormattedCreditLine}" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding FileName}" FontSize="10" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+
+                                        <!-- Actions -->
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="0,0,2,0">
+                                            <Button Click="OnEditArtworkFromListClicked" Tag="{Binding}" ToolTipService.ToolTip="Edit Title, Artist, and Credits" Padding="6,4">
+                                                <StackPanel Orientation="Horizontal" Spacing="3">
+                                                    <FontIcon Glyph="&#xE70F;" FontSize="11"/>
+                                                    <TextBlock Text="Edit" FontSize="11"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Click="OnDeleteArtworkFromListClicked" Tag="{Binding}" ToolTipService.ToolTip="Remove artwork from gallery" Padding="6,5">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="11" Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <!-- VIEW 2: INLINE EDIT PANEL -->
+                <ScrollViewer x:Name="PanelManageEdit" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="460" Padding="0,0,8,0">
+                    <StackPanel Spacing="10">
+                        <InfoBar x:Name="InfoBarManageEditStatus" IsOpen="False" Severity="Error" Margin="0,0,0,4" IsClosable="True"/>
+
+                        <!-- Image Preview -->
+                        <Border Height="140" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                            <Image x:Name="ImgManageEditPreview" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+
+                        <TextBlock x:Name="TxtManageEditFileName" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+
+                        <TextBox x:Name="TxtManageEditTitle" Header="Title / Caption" PlaceholderText="e.g. No help is coming"/>
+                        <TextBox x:Name="TxtManageEditArtist" Header="Artist / Creator" PlaceholderText="e.g. PQHAUS"/>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="1*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="TxtManageEditCredit" Grid.Column="0" Header="Credits / Attribution (CTTO)" PlaceholderText="e.g. ctto, Reddit, Instagram"/>
+                            <TextBox x:Name="TxtManageEditYear" Grid.Column="1" Header="Year" PlaceholderText="e.g. 2024"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </ContentDialog>
+
     </Grid>
 </Page>

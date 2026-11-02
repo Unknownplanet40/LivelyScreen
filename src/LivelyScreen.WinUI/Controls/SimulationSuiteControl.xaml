@@ -1,0 +1,381 @@
+<UserControl
+    x:Class="LivelyScreen_WinUI.Controls.SimulationSuiteControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:LivelyScreen_WinUI.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid x:Name="RootSimGrid" Background="#000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+
+        <!-- =================================================================== -->
+        <!-- 1. REAL-TIME SYSTEM MONITOR / SOC DASHBOARD (WIN2D)                 -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelCyberOps" Visibility="Collapsed" Background="#080C0A" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+
+        <!-- =================================================================== -->
+        <!-- 2. WINDOWS 11 & WINDOWS 10 UPDATE & BOOT SCREEN                     -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelWindowsUpdate" Visibility="Collapsed" Background="#000000">
+            <!-- Boot-only Windows Logo (centered at 40% height during boot sequence, fades in over 0.4s) -->
+            <Grid x:Name="ContainerWinLogo" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" Opacity="0">
+                <Viewbox x:Name="VectorWin11Logo" Width="92" Height="92" Stretch="Uniform" Visibility="Visible">
+                    <Canvas Width="88" Height="88">
+                        <Path Fill="#2AA6F5" Data="M 0,0 H 42 V 42 H 0 Z"/>
+                        <Path Fill="#1B8DEB" Data="M 46,0 H 88 V 42 H 46 Z"/>
+                        <Path Fill="#1B8DEB" Data="M 0,46 H 42 V 88 H 0 Z"/>
+                        <Path Fill="#0F78D8" Data="M 46,46 H 88 V 88 H 46 Z"/>
+                    </Canvas>
+                </Viewbox>
+                <Viewbox x:Name="VectorWin10Logo" Width="92" Height="92" Stretch="Uniform" Visibility="Collapsed">
+                    <Path Fill="#00A4EF"
+                          Data="M 0,12.4 L 35.7,7.5 L 35.7,42.0 L 0,42.2 Z M 35.7,45.9 L 35.7,80.4 L 0,75.5 L 0,45.7 Z M 40.0,6.9 L 87.3,0 L 87.3,41.5 L 40.0,41.9 Z M 87.3,46.3 L 87.3,87.6 L 40.0,80.9 L 40.0,46.2 Z"/>
+                </Viewbox>
+            </Grid>
+
+            <Grid x:Name="StackWinCenterContent">
+                <!-- 6-dot spinner: center at x = 50%, y = 35.9% (update) or y = 76.0% (boot) -->
+                <Canvas x:Name="CanvasWinSpinner"
+                        Width="50"
+                        Height="50"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Top"/>
+
+                <!-- Text lines positioned at exact screen height percentages: 43.4%, 48.0%, 88.0% -->
+                <Grid x:Name="StackWinUpdateText">
+                    <TextBlock x:Name="TxtWinUpdatePercent"
+                               Text="Working on updates 10%"
+                               FontFamily="Segoe UI Semilight, Segoe UI Light, Segoe UI"
+                               FontSize="21"
+                               FontWeight="SemiLight"
+                               Foreground="#FFFFFF"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Top"/>
+                    <TextBlock x:Name="TxtWinDontTurnOff"
+                               Text="Don't turn off your PC. This will take a while."
+                               FontFamily="Segoe UI Semilight, Segoe UI Light, Segoe UI"
+                               FontSize="21"
+                               FontWeight="SemiLight"
+                               Foreground="#FFFFFF"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Top"/>
+                </Grid>
+
+                <TextBlock x:Name="TxtWinBottomRestart"
+                           Text="Your PC may restart several times"
+                           FontFamily="Segoe UI Semilight, Segoe UI Light, Segoe UI"
+                           FontSize="21"
+                           FontWeight="SemiLight"
+                           Foreground="#FFFFFF"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
+            </Grid>
+        </Grid>
+
+        <!-- =================================================================== -->
+        <!-- 3. MACOS UPDATE SCREEN (1:1 REFERENCE AT 1365x767)                  -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelMacUpdate" Visibility="Collapsed" Background="#000000">
+            <!-- White Apple logo: bbox x 627-738 (111px, 8.13% W), y 274-410 (137px, 17.86% H), center y = 44.59% H -->
+            <Viewbox x:Name="ViewboxMacLogo"
+                     Width="111"
+                     Height="137"
+                     Stretch="Fill"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Top">
+                <Canvas Width="248.4" Height="305.0">
+                    <Path Fill="#FFFFFF"
+                          Data="M15.1,112.119c-25.785,44.745-9.393,112.648,19.121,153.82C48.45,286.523,62.86,305,82.6,305 c0.372,0,0.745-0.007,1.127-0.022c9.273-0.37,15.974-3.225,22.453-5.984c7.274-3.1,14.797-6.305,26.597-6.305 c11.226,0,18.39,3.101,25.318,6.099c6.828,2.954,13.861,6.01,24.253,5.815c22.232-0.414,35.882-20.352,47.925-37.941 c12.567-18.365,18.871-36.196,20.998-43.01l0.086-0.271c0.405-1.211-0.167-2.533-1.328-3.066c-0.032-0.015-0.15-0.064-0.183-0.078 c-3.915-1.601-38.257-16.836-38.618-58.36c-0.335-33.736,25.763-51.601,30.997-54.839l0.244-0.152 c0.567-0.365,0.962-0.944,1.096-1.606c0.134-0.661-0.006-1.349-0.386-1.905c-18.014-26.362-45.624-30.335-56.74-30.813 c-1.613-0.161-3.278-0.242-4.95-0.242c-13.056,0-25.563,4.931-35.611,8.893c-6.936,2.735-12.927,5.097-17.059,5.097 c-4.643,0-10.668-2.391-17.645-5.159c-9.33-3.703-19.905-7.899-31.1-7.899c-0.267,0-0.53,0.003-0.789,0.008 C53.25,73.643,28.66,88.535,15.1,112.119z"/>
+                    <Path Fill="#FFFFFF"
+                          Data="M186.46,0.002c-15.763,0.642-34.672,10.345-45.974,23.583c-9.605,11.127-18.988,29.679-16.516,48.379 c0.155,1.17,1.107,2.073,2.284,2.164c1.064,0.083,2.15,0.125,3.232,0.126c15.413,0,32.04-8.527,43.395-22.257 c11.951-14.498,17.994-33.104,16.166-49.77C188.90,0.921,187.75-0.049,186.46,0.002z"/>
+                </Canvas>
+            </Viewbox>
+
+            <!-- Progress bar: x 523-842 (320px, 23.44% W), y 488-494 (6px, 0.78% H), center y = 64.0% H, track #C0C0C0, fill #FFFFFF -->
+            <Border x:Name="BarMacProgressTrack"
+                    Width="320"
+                    Height="6"
+                    CornerRadius="3"
+                    Background="#C0C0C0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top">
+                <Border x:Name="BarMacProgressFill"
+                        Width="10"
+                        Height="6"
+                        CornerRadius="3"
+                        Background="#FFFFFF"
+                        HorizontalAlignment="Left"/>
+            </Border>
+        </Grid>
+
+        <!-- =================================================================== -->
+        <!-- 4. UBUNTU BOOT/UPDATE SCREEN (PLYMOUTH STYLE, 1:1 AT 1365x767)      -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelUbuntuUpdate" Visibility="Collapsed" Background="#2C0220">
+            <!-- White "ubuntu" wordmark with circle-of-friends: bbox x 539-853, y 335-401 -->
+            <Canvas x:Name="CanvasUbuntuUpdate" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <Image x:Name="ImgUbuntuWordmark"
+                       Stretch="Fill"/>
+                <Ellipse x:Name="UbuntuDot0" Fill="#FC3D04"/>
+                <Ellipse x:Name="UbuntuDot1" Fill="#FC3D04"/>
+                <Ellipse x:Name="UbuntuDot2" Fill="#FC3D04"/>
+                <Ellipse x:Name="UbuntuDot3" Fill="#FC3D04"/>
+                <Ellipse x:Name="UbuntuDot4" Fill="#FC3D04"/>
+            </Canvas>
+        </Grid>
+
+        <!-- =================================================================== -->
+        <!-- 5. CHROMEOS SYSTEM UPDATE SCREEN (1:1 REFERENCE AT 1365x767)        -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelChromeOSUpdate" Visibility="Collapsed" Background="#FFFFFF">
+            <!-- Material indeterminate blue arc spinner at center y = 39.13% H -->
+            <Canvas x:Name="CanvasChromeSpinner"
+                    Width="50"
+                    Height="50"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top">
+                <Path x:Name="PathChromeSpinnerArc"
+                      Stroke="#367DF3"
+                      StrokeThickness="4.5"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"/>
+            </Canvas>
+
+            <!-- Title: "Updating your device", center y = 49.13% H -->
+            <TextBlock x:Name="TxtChromeTitle"
+                       Text="Updating your device"
+                       FontFamily="Roboto, Segoe UI"
+                       FontSize="26"
+                       FontWeight="Normal"
+                       Foreground="#202124"
+                       TextAlignment="Center"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Top"/>
+
+            <!-- Subtitle: "Installing system update. Please keep your Chromebook plugged in.", center y = 54.17% H -->
+            <TextBlock x:Name="TxtChromeSub"
+                       Text="Installing system update. Please keep your Chromebook plugged in."
+                       FontFamily="Roboto, Segoe UI"
+                       FontSize="18"
+                       FontWeight="Normal"
+                       Foreground="#5F6368"
+                       TextAlignment="Center"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Top"/>
+
+            <!-- Progress bar at center y = 61.57% H, width = 29.39% W, height = 0.78% H -->
+            <Border x:Name="BarChromeProgressTrack"
+                    Width="401"
+                    Height="6"
+                    CornerRadius="3"
+                    Background="#DBDDE1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top">
+                <Border x:Name="BarChromeProgressFill"
+                        Width="121"
+                        Height="6"
+                        CornerRadius="3"
+                        Background="#4586F4"
+                        HorizontalAlignment="Left"/>
+            </Border>
+        </Grid>
+
+        <!-- =================================================================== -->
+        <!-- 6. CRASH SCREENS: WINDOWS BSOD, MACOS PANIC, UBUNTU PANIC, CHROMEOS -->
+        <!-- =================================================================== -->
+        <Grid x:Name="PanelBsodPrank" Visibility="Collapsed" Background="#0078D7">
+            <!-- 6A-1. Windows 10 Blue Crash Screen (#0078D7) -->
+            <Grid x:Name="SubPanelWinBsod" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <TextBlock x:Name="TxtWin10BsodSadFace"
+                           Text=":("
+                           FontFamily="Segoe UI Light, Segoe UI Semilight, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtBsodMainMessage"
+                           Text="Your PC ran into a problem and needs to restart. We're"
+                           FontFamily="Segoe UI Light, Segoe UI Semilight, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtBsodSecondaryMessage"
+                           Text="just collecting some error info, and then we'll restart for you."
+                           FontFamily="Segoe UI Light, Segoe UI Semilight, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtBsodPercent"
+                           Text="0% complete"
+                           FontFamily="Segoe UI Light, Segoe UI Semilight, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <!-- QR Code block (11.6% of height square) at left margin, y = 60.2%..71.8% of height -->
+                <Border x:Name="BorderWin10BsodQr"
+                        Background="#FFFFFF"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top">
+                    <Viewbox Stretch="Uniform">
+                        <Canvas x:Name="CanvasBsodQr" Width="100" Height="100" Background="#FFFFFF"/>
+                    </Viewbox>
+                </Border>
+
+                <TextBlock x:Name="TxtWin10BsodUrl"
+                           Text="For more information about this issue and possible fixes, visit https://www.windows.com/stopcode"
+                           FontFamily="Segoe UI, Segoe UI Semilight"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtWin10BsodSupport"
+                           Text="If you call a support person, give them this info:"
+                           FontFamily="Segoe UI, Segoe UI Semilight"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtBsodStopCode"
+                           Text="Stop code: CRITICAL_PROCESS_DIED"
+                           FontFamily="Segoe UI, Segoe UI Semilight"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+            </Grid>
+
+            <!-- 6A-2. Windows 11 24H2+ Black Crash Screen (#000000, no :(, no QR, no URL) -->
+            <Grid x:Name="SubPanelWin11BlackBsod" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <TextBlock x:Name="TxtWin11BsodMain"
+                           Text="Your device ran into a problem and needs to restart."
+                           FontFamily="Segoe UI Semilight, Segoe UI Light, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtWin11BsodPercent"
+                           Text="0% complete"
+                           FontFamily="Segoe UI Semilight, Segoe UI Light, Segoe UI"
+                           FontWeight="Light"
+                           Foreground="#FFFFFF"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtWin11BsodStopCode"
+                           Text="Stop code: CRITICAL_PROCESS_DIED"
+                           FontFamily="Segoe UI, Segoe UI Semilight"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtWin11BsodWhatFailed"
+                           Text="What failed: ntoskrnl.exe"
+                           FontFamily="Segoe UI, Segoe UI Semilight"
+                           Foreground="#FFFFFF"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Top"/>
+            </Grid>
+
+            <!-- 6B. macOS Multilingual Kernel Panic Restart Screen (1:1 Reference #1A1A1A) -->
+            <Grid x:Name="SubPanelUnixPanic" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <TextBlock x:Name="TxtMacPanicEn1"
+                           Text="You need to restart your computer. Hold down the Power button for"
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBlock x:Name="TxtMacPanicEn2"
+                           Text="several seconds or press the Restart button."
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtMacPanicFr1"
+                           Text="Vous devez redémarrer votre ordinateur. Maintenez la touche de démarrage"
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBlock x:Name="TxtMacPanicFr2"
+                           Text="enfoncée pendant plusieurs secondes ou bien appuyez sur le bouton de réinitialisation."
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtMacPanicDe1"
+                           Text="Ihr Computer muss neu gestartet werden. Halten Sie dazu die Ein-/Aus-Taste"
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBlock x:Name="TxtMacPanicDe2"
+                           Text="einige Sekunden gedrückt oder drücken Sie die Neustart-Taste."
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtMacPanicJa1"
+                           Text="コンピュータを再起動する必要があります。パワーボタンを数秒間押し続けるか、"
+                           FontFamily="Yu Gothic UI, Meiryo, Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBlock x:Name="TxtMacPanicJa2"
+                           Text="リセットボタンを押してください。"
+                           FontFamily="Yu Gothic UI, Meiryo, Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtMacPanicEs1"
+                           Text="Debes reiniciar el ordenador. Mantén pulsado el botón de arranque durante"
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                <TextBlock x:Name="TxtMacPanicEs2"
+                           Text="unos segundos o pulsa el botón de reinicio."
+                           FontFamily="Segoe UI" Foreground="#FAFAFA" TextAlignment="Center" HorizontalAlignment="Center" VerticalAlignment="Top"/>
+            </Grid>
+
+            <!-- 6C. Ubuntu Linux Console Kernel Panic (1:1 Reference #000000, 19 lines) -->
+            <Canvas x:Name="SubPanelUbuntuPanic" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+
+            <!-- 6D. ChromeOS "Chrome OS is missing or damaged." Recovery Screen (1:1 Reference #FFFFFF) -->
+            <Grid x:Name="SubPanelChromePanic" Visibility="Collapsed" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <!-- Red circle with white exclamation mark at center y = 35.13% H -->
+                <Grid x:Name="GridChromeCrashIcon"
+                      Width="70.6"
+                      Height="70.6"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Top">
+                    <Ellipse Fill="#D93025"/>
+                    <Canvas x:Name="CanvasChromeCrashExcl">
+                        <Rectangle x:Name="RectChromeExclStem" Fill="#FFFFFF" RadiusX="1" RadiusY="1"/>
+                        <Ellipse x:Name="EllipseChromeExclDot" Fill="#FFFFFF"/>
+                    </Canvas>
+                </Grid>
+
+                <TextBlock x:Name="TxtChromeCrashTitle"
+                           Text="Chrome OS is missing or damaged."
+                           FontFamily="Roboto, Segoe UI"
+                           Foreground="#202124"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
+
+                <TextBlock x:Name="TxtChromeCrashSub"
+                           Text="Please insert a recovery USB stick or SD card."
+                           FontFamily="Roboto, Segoe UI"
+                           Foreground="#5F6368"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Top"/>
+            </Grid>
+        </Grid>
+
+        <!-- =================================================================== -->
+        <!-- 7. START DELAY OVERLAY ("Starting in 5...")                         -->
+        <!-- =================================================================== -->
+        <Grid x:Name="OverlayStartDelay" Visibility="Collapsed" Background="#D8000000">
+            <TextBlock x:Name="TxtStartDelayCountdown"
+                       Text="Starting in 5"
+                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                       FontSize="28"
+                       FontWeight="Medium"
+                       Foreground="#FFFFFF"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+    </Grid>
+</UserControl>

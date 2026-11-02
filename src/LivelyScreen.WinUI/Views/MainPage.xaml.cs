@@ -26,6 +26,8 @@ public sealed partial class MainPage : Page
     private IntPtr _windowHandle = IntPtr.Zero;
     private bool _isInitializing = true;
     private int _currentEditingDisplayIndex = 0;
+    private readonly LivelyScreen.Services.DisplayPowerService _displayPowerService = new();
+    private int _ddcCiProbeVersion = 0;
 
     public event Action? ThemePreferenceChanged;
     public event Action? ScreensaverRequested;
@@ -113,6 +115,49 @@ public sealed partial class MainPage : Page
         ComboThemeMode.SelectedIndex = (int)s.ThemeMode;
         ComboSegmentOverride.SelectedIndex = (int)s.SegmentOverride;
 
+        if (SliderSimStartPercent != null)
+        {
+            SliderSimStartPercent.Value = Math.Clamp(s.SimulationStartPercent, 0, 99);
+        }
+        if (TxtSimStartPercent != null)
+        {
+            TxtSimStartPercent.Text = $"{Math.Clamp(s.SimulationStartPercent, 0, 99)}%";
+        }
+        if (TxtSimCustomMinutes != null)
+        {
+            TxtSimCustomMinutes.Text = Math.Clamp(s.SimulationDurationMinutes, 1, 480).ToString();
+        }
+        if (ComboSimWhenFinished != null)
+        {
+            ComboSimWhenFinished.SelectedIndex = Math.Clamp((int)s.SimulationWhenFinished, 0, 3);
+        }
+        if (ComboSimMultiMonitorMode != null)
+        {
+            ComboSimMultiMonitorMode.SelectedIndex = string.Equals(
+                s.MULTI_MONITOR_MODE,
+                AppSettings.MultiMonitorModeMirror,
+                StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        }
+        if (ToggleSimMaskSensitive != null)
+        {
+            ToggleSimMaskSensitive.IsOn = s.MASK_SENSITIVE;
+        }
+        if (ToggleSimEnterBsod != null)
+        {
+            ToggleSimEnterBsod.IsOn = s.SimulationEnterTriggerBsod;
+        }
+        if (SliderSimSpinnerSpeed != null)
+        {
+            SliderSimSpinnerSpeed.Value = Math.Clamp(s.SimulationSpinnerSpeedSeconds > 0 ? s.SimulationSpinnerSpeedSeconds : 1.75, 0.6, 3.0);
+        }
+        if (TxtSimSpinnerSpeed != null)
+        {
+            TxtSimSpinnerSpeed.Text = $"{(s.SimulationSpinnerSpeedSeconds > 0 ? s.SimulationSpinnerSpeedSeconds : 1.75):F2}s / rot";
+        }
+        LoadSimBsodAndCustomTextsToUI(s);
+        UpdateSimPresetButtonsUI();
+        UpdateSimScheduleSummaryText();
+
         ToggleCustomSolar.IsOn = s.UseCustomSolarTimes;
 
         if (TimeSpan.TryParse(s.CustomSunriseTime, out var srTime))
@@ -169,6 +214,7 @@ public sealed partial class MainPage : Page
         ComboTriggerCorner.SelectedIndex = (int)s.TriggerCorner;
         ComboDisableCorner.SelectedIndex = (int)s.DisableCorner;
         TogglePauseOnBattery.IsOn = s.PauseOnBattery;
+        if (TogglePowerOffInactiveDisplays != null) TogglePowerOffInactiveDisplays.IsOn = s.PowerOffInactiveDisplays;
         TxtBlockedProcesses.Text = s.BlockedProcesses != null && s.BlockedProcesses.Count > 0
             ? string.Join(", ", s.BlockedProcesses)
             : "";
@@ -506,6 +552,7 @@ public sealed partial class MainPage : Page
         }
 
         var sources = _mediaLibrary.GetMediaSources();
+        sources.AddRange(_mediaLibrary.GetSimulationSources());
 
         for (int i = 0; i < displays.Count; i++)
         {
@@ -577,6 +624,90 @@ public sealed partial class MainPage : Page
         }
     }
 
+    private async void UpdateDdcCiStatusAsync(int targetIdx)
+    {
+        if (PanelDdcCiStatus == null || TxtDdcCiStatus == null || IconDdcCiStatus == null) return;
+
+        var displays = DisplayArea.FindAll();
+        var inactiveDisplays = new List<(int Index, DisplayArea Display)>();
+        for (int i = 0; i < displays.Count; i++)
+        {
+            if (i != targetIdx)
+            {
+                inactiveDisplays.Add((i, displays[i]));
+            }
+        }
+
+        if (inactiveDisplays.Count == 0)
+        {
+            PanelDdcCiStatus.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        PanelDdcCiStatus.Visibility = Visibility.Visible;
+        TxtDdcCiStatus.Text = "Checking monitor DDC/CI hardware support...";
+        IconDdcCiStatus.Glyph = "\uE895";
+        IconDdcCiStatus.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 96, 205, 255));
+
+        int probeVersion = ++_ddcCiProbeVersion;
+        var results = await Task.Run(() =>
+        {
+            var list = new List<(int Index, bool Supported)>();
+            foreach (var (idx, d) in inactiveDisplays)
+            {
+                bool sup = _displayPowerService.CheckDisplayDdcCiSupport(d);
+                list.Add((idx, sup));
+            }
+            return list;
+        });
+
+        if (probeVersion != _ddcCiProbeVersion) return;
+
+        var successBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 108, 203, 95));
+        var cautionBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 245, 200, 76));
+
+        if (results.Count == 1)
+        {
+            var (idx, sup) = results[0];
+            if (sup)
+            {
+                TxtDdcCiStatus.Text = $"Monitor {idx + 1}: DDC/CI Supported (Hardware standby ready)";
+                IconDdcCiStatus.Glyph = "\uE73E";
+                IconDdcCiStatus.Foreground = successBrush;
+            }
+            else
+            {
+                TxtDdcCiStatus.Text = $"Monitor {idx + 1}: DDC/CI not supported (Black screen fallback will be used)";
+                IconDdcCiStatus.Glyph = "\uE7BA";
+                IconDdcCiStatus.Foreground = cautionBrush;
+            }
+        }
+        else
+        {
+            var supported = results.Where(r => r.Supported).Select(r => $"Monitor {r.Index + 1}").ToList();
+            var unsupported = results.Where(r => !r.Supported).Select(r => $"Monitor {r.Index + 1}").ToList();
+
+            if (unsupported.Count == 0)
+            {
+                TxtDdcCiStatus.Text = $"{string.Join(", ", supported)}: DDC/CI Supported (Hardware standby ready)";
+                IconDdcCiStatus.Glyph = "\uE73E";
+                IconDdcCiStatus.Foreground = successBrush;
+            }
+            else if (supported.Count == 0)
+            {
+                TxtDdcCiStatus.Text = $"{string.Join(", ", unsupported)}: DDC/CI not supported (Black screen fallback will be used)";
+                IconDdcCiStatus.Glyph = "\uE7BA";
+                IconDdcCiStatus.Foreground = cautionBrush;
+            }
+            else
+            {
+                TxtDdcCiStatus.Text = $"{string.Join(", ", supported)}: Supported | {string.Join(", ", unsupported)}: Unsupported (Fallback active)";
+                IconDdcCiStatus.Glyph = "\uE7BA";
+                IconDdcCiStatus.Foreground = cautionBrush;
+            }
+        }
+    }
+
     private void OnMockupDisplaySelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_isInitializing) return;
@@ -594,15 +725,34 @@ public sealed partial class MainPage : Page
 
         var dynSources = _mediaLibrary.GetDynamicThemeSources();
         var stdSources = _mediaLibrary.GetStandardFolderSources();
+        var simSources = _mediaLibrary.GetSimulationSources();
 
         ListDynamicThemes.ItemsSource = dynSources;
         ListStandardFolders.ItemsSource = stdSources;
+        if (ListSimulationSources != null)
+        {
+            ListSimulationSources.ItemsSource = simSources;
+        }
 
         TxtThemeBadge.Text = $"{dynSources.Count} Theme(s)";
         TxtStandardFolderBadge.Text = $"{stdSources.Count} Folder(s)";
+        if (TxtSimulationBadge != null)
+        {
+            var activeSimMode = _settingsService.Current.GetEffectiveSimulationMode();
+            TxtSimulationBadge.Text = _settingsService.Current.IsSimulationActive && activeSimMode != SimulationModeType.None
+                ? $"✓ Active: {AppSettings.GetSimulationDisplayName(activeSimMode)}"
+                : $"{simSources.Count} Modes";
+        }
 
         var activePath = _settingsService.Current.ActiveSourcePath;
-        if (string.IsNullOrEmpty(activePath) || string.Equals(activePath, "ALL", StringComparison.OrdinalIgnoreCase))
+        if (_settingsService.Current.IsSimulationActive)
+        {
+            var simMode = _settingsService.Current.GetEffectiveSimulationMode();
+            TxtActiveSourceTitle.Text = $"Simulation Suite: {AppSettings.GetSimulationDisplayName(simMode)} (Widgets Suppressed)";
+            BtnPlayAllCombined.Content = "Play All (Combined)";
+            BtnPlayAllCombined.IsEnabled = true;
+        }
+        else if (string.IsNullOrEmpty(activePath) || string.Equals(activePath, "ALL", StringComparison.OrdinalIgnoreCase))
         {
             TxtActiveSourceTitle.Text = $"All Sources Combined ({stdSources.Count} folders • {_mediaLibrary.TotalMediaCount} items)";
             BtnPlayAllCombined.Content = "✓ Active Combined";
@@ -631,10 +781,256 @@ public sealed partial class MainPage : Page
         UpdateMiniMonitorWallpaper();
     }
 
+    private void OnSimDurationPresetClicked(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null || sender is not Button btn || btn.Tag is not string tag) return;
+        var s = _settingsService.Current;
+        if (string.Equals(tag, "custom", StringComparison.OrdinalIgnoreCase))
+        {
+            s.SimulationIsCustomDuration = true;
+            if (TxtSimCustomMinutes != null && int.TryParse(TxtSimCustomMinutes.Text, out int customMins))
+            {
+                s.SimulationDurationMinutes = Math.Clamp(customMins, 1, 480);
+            }
+        }
+        else if (int.TryParse(tag, out int mins))
+        {
+            s.SimulationIsCustomDuration = false;
+            s.SimulationDurationMinutes = Math.Clamp(mins, 1, 480);
+            if (TxtSimCustomMinutes != null)
+            {
+                TxtSimCustomMinutes.Text = s.SimulationDurationMinutes.ToString();
+            }
+        }
+
+        _settingsService.Save();
+        UpdateSimPresetButtonsUI();
+        UpdateSimScheduleSummaryText();
+        if (ListSimulationSources != null && _mediaLibrary != null)
+        {
+            ListSimulationSources.ItemsSource = _mediaLibrary.GetSimulationSources();
+        }
+    }
+
+    private void OnSimCustomMinutesTextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null || TxtSimCustomMinutes == null) return;
+        if (int.TryParse(TxtSimCustomMinutes.Text.Trim(), out int mins))
+        {
+            var s = _settingsService.Current;
+            s.SimulationDurationMinutes = Math.Clamp(mins, 1, 480);
+            s.SimulationIsCustomDuration = true;
+            _settingsService.Save();
+            UpdateSimPresetButtonsUI();
+            UpdateSimScheduleSummaryText();
+            if (ListSimulationSources != null && _mediaLibrary != null)
+            {
+                ListSimulationSources.ItemsSource = _mediaLibrary.GetSimulationSources();
+            }
+        }
+    }
+
+    private void OnSimDelayPresetClicked(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null || sender is not Button btn || btn.Tag is not string tag) return;
+        if (int.TryParse(tag, out int delaySec))
+        {
+            _settingsService.Current.SimulationStartDelaySeconds = Math.Clamp(delaySec, 0, 60);
+            _settingsService.Save();
+            UpdateSimPresetButtonsUI();
+            UpdateSimScheduleSummaryText();
+        }
+    }
+
+    private void UpdateSimPresetButtonsUI()
+    {
+        if (_settingsService == null) return;
+        var s = _settingsService.Current;
+        int mins = s.SimulationDurationMinutes;
+        bool isPreset = !s.SimulationIsCustomDuration && (mins == 1 || mins == 5 || mins == 15 || mins == 30 || mins == 60);
+        bool showCustom = s.SimulationIsCustomDuration || !isPreset;
+
+        SetPillButtonSelected(BtnDur1m, !showCustom && mins == 1);
+        SetPillButtonSelected(BtnDur5m, !showCustom && mins == 5);
+        SetPillButtonSelected(BtnDur15m, !showCustom && mins == 15);
+        SetPillButtonSelected(BtnDur30m, !showCustom && mins == 30);
+        SetPillButtonSelected(BtnDur60m, !showCustom && mins == 60);
+        SetPillButtonSelected(BtnDurCustom, showCustom);
+
+        if (PanelSimCustomDuration != null)
+        {
+            PanelSimCustomDuration.Visibility = showCustom ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        int delay = s.SimulationStartDelaySeconds;
+        SetPillButtonSelected(BtnDelayNow, delay <= 0);
+        SetPillButtonSelected(BtnDelay5s, delay == 5);
+        SetPillButtonSelected(BtnDelay10s, delay == 10);
+    }
+
+    private static void SetPillButtonSelected(Button? btn, bool selected)
+    {
+        if (btn == null) return;
+        btn.FontWeight = selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+        if (selected)
+        {
+            btn.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["ControlFillColorSecondaryBrush"];
+            btn.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+            btn.BorderThickness = new Thickness(1.5);
+        }
+        else
+        {
+            btn.ClearValue(Control.BackgroundProperty);
+            btn.ClearValue(Control.BorderBrushProperty);
+            btn.BorderThickness = new Thickness(1);
+        }
+    }
+
+    private void UpdateSimScheduleSummaryText()
+    {
+        if (TxtSimScheduleSummary == null || _settingsService == null) return;
+        var s = _settingsService.Current;
+        int startPct = Math.Clamp(s.SimulationStartPercent, 0, 99);
+        int mins = Math.Clamp(s.SimulationDurationMinutes, 1, 480);
+        int remPct = Math.Max(1, 100 - startPct);
+        double secPerPct = (mins * 60.0) / remPct;
+        var eta = DateTime.Now.AddMinutes(mins).AddSeconds(s.SimulationStartDelaySeconds);
+        string delayTag = s.SimulationStartDelaySeconds > 0 ? $" • Delay {s.SimulationStartDelaySeconds}s" : "";
+
+        if (s.SimulationWhenFinished == SimulationFinishAction.HoldAt99)
+        {
+            TxtSimScheduleSummary.Text = $"{startPct}% → 99% over {mins} min (~{secPerPct:F1}s per 1%{delayTag} • Holds at 99%)";
+        }
+        else
+        {
+            TxtSimScheduleSummary.Text = $"{startPct}% → 100% in {mins} min (~{secPerPct:F1}s per 1%{delayTag} • Finishes ~{eta:h:mm tt})";
+        }
+    }
+
+    private void LoadSimBsodAndCustomTextsToUI(AppSettings s)
+    {
+        if (ComboSimBsodStopCode != null)
+        {
+            string code = string.IsNullOrWhiteSpace(s.SimulationBsodStopCode) ? "CRITICAL_PROCESS_DIED" : s.SimulationBsodStopCode.Trim();
+            int matchedIdx = -1;
+            for (int i = 0; i < ComboSimBsodStopCode.Items.Count - 1; i++)
+            {
+                if (ComboSimBsodStopCode.Items[i] is ComboBoxItem cbi &&
+                    string.Equals(cbi.Content?.ToString(), code, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchedIdx = i;
+                    break;
+                }
+            }
+            if (matchedIdx >= 0)
+            {
+                ComboSimBsodStopCode.SelectedIndex = matchedIdx;
+                if (TxtSimCustomStopCode != null) TxtSimCustomStopCode.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ComboSimBsodStopCode.SelectedIndex = ComboSimBsodStopCode.Items.Count - 1;
+                if (TxtSimCustomStopCode != null)
+                {
+                    TxtSimCustomStopCode.Text = code;
+                    TxtSimCustomStopCode.Visibility = Visibility.Visible;
+                }
+            }
+        }
+        if (TxtSimBsodMainMsg != null) TxtSimBsodMainMsg.Text = s.SimulationBsodMainMessage ?? "";
+        if (TxtSimCustomLine1 != null) TxtSimCustomLine1.Text = s.SimulationCustomUpdateLine1 ?? "";
+        if (TxtSimCustomLine2 != null) TxtSimCustomLine2.Text = s.SimulationCustomUpdateLine2 ?? "";
+        if (TxtSimCustomBottomText != null) TxtSimCustomBottomText.Text = s.SimulationCustomUpdateBottomText ?? "";
+    }
+
+    private void OnSimBsodStopCodeComboChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null || ComboSimBsodStopCode == null) return;
+        int idx = ComboSimBsodStopCode.SelectedIndex;
+        int lastIdx = ComboSimBsodStopCode.Items.Count - 1;
+        if (idx == lastIdx)
+        {
+            if (TxtSimCustomStopCode != null)
+            {
+                TxtSimCustomStopCode.Visibility = Visibility.Visible;
+                if (string.IsNullOrWhiteSpace(TxtSimCustomStopCode.Text))
+                    TxtSimCustomStopCode.Text = _settingsService.Current.SimulationBsodStopCode;
+            }
+        }
+        else if (idx >= 0 && ComboSimBsodStopCode.Items[idx] is ComboBoxItem cbi && cbi.Content is string presetCode)
+        {
+            if (TxtSimCustomStopCode != null) TxtSimCustomStopCode.Visibility = Visibility.Collapsed;
+            _settingsService.Current.SimulationBsodStopCode = presetCode;
+            _settingsService.Save();
+        }
+    }
+
+    private void OnSimCustomTextFieldsChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null) return;
+        var s = _settingsService.Current;
+        if (TxtSimCustomStopCode != null && TxtSimCustomStopCode.Visibility == Visibility.Visible)
+        {
+            s.SimulationBsodStopCode = string.IsNullOrWhiteSpace(TxtSimCustomStopCode.Text)
+                ? "CRITICAL_PROCESS_DIED"
+                : TxtSimCustomStopCode.Text.Trim();
+        }
+        if (TxtSimBsodMainMsg != null)
+        {
+            s.SimulationBsodMainMessage = string.IsNullOrWhiteSpace(TxtSimBsodMainMsg.Text)
+                ? "Your device ran into a problem and needs to restart."
+                : TxtSimBsodMainMsg.Text.Trim();
+        }
+        if (TxtSimCustomLine1 != null) s.SimulationCustomUpdateLine1 = TxtSimCustomLine1.Text?.Trim() ?? "";
+        if (TxtSimCustomLine2 != null) s.SimulationCustomUpdateLine2 = TxtSimCustomLine2.Text?.Trim() ?? "";
+        if (TxtSimCustomBottomText != null) s.SimulationCustomUpdateBottomText = TxtSimCustomBottomText.Text?.Trim() ?? "";
+        _settingsService.Save();
+    }
+
+    private void OnSimResetCustomTextsClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        var s = _settingsService.Current;
+        s.SimulationSpinnerSpeedSeconds = 1.75;
+        s.SimulationBsodStopCode = "CRITICAL_PROCESS_DIED";
+        s.SimulationBsodMainMessage = "Your device ran into a problem and needs to restart.";
+        s.SimulationBsodSecondaryMessage = "We're just collecting some error info, and then we'll restart for you.";
+        s.SimulationCustomUpdateLine1 = "";
+        s.SimulationCustomUpdateLine2 = "";
+        s.SimulationCustomUpdateBottomText = "";
+        _settingsService.Save();
+
+        _isInitializing = true;
+        if (SliderSimSpinnerSpeed != null) SliderSimSpinnerSpeed.Value = 1.75;
+        if (TxtSimSpinnerSpeed != null) TxtSimSpinnerSpeed.Text = "1.75s / rot";
+        LoadSimBsodAndCustomTextsToUI(s);
+        _isInitializing = false;
+    }
+
+    private void OnSimRestartPreviewClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        var s = _settingsService.Current;
+        if (!s.IsSimulationActive)
+        {
+            var mode = s.SelectedSimulationMode != SimulationModeType.None
+                ? s.SelectedSimulationMode
+                : SimulationModeType.Windows10Update;
+            s.SimulationModeEnabled = true;
+            s.SelectedSimulationMode = mode;
+            s.ActiveSourcePath = AppSettings.GetSimulationSourceKey(mode);
+            s.DynamicThemeEnabled = false;
+            _settingsService.Save();
+            UpdateSourceList();
+        }
+        ScreensaverRequested?.Invoke();
+    }
+
     private void OnPlayAllCombinedClicked(object sender, RoutedEventArgs e)
     {
         if (_settingsService == null || _mediaLibrary == null) return;
         _settingsService.Current.ActiveSourcePath = "ALL";
+        _settingsService.Current.SimulationModeEnabled = false;
         _settingsService.Save();
         _mediaLibrary.ResetSequenceIndex();
         UpdateSourceList();
@@ -648,12 +1044,20 @@ public sealed partial class MainPage : Page
         {
             _settingsService.Current.ActiveSourcePath = path;
 
-            if (path == "ALL")
+            if (AppSettings.TryParseSimulationSource(path, out var simMode))
             {
+                _settingsService.Current.SimulationModeEnabled = true;
+                _settingsService.Current.SelectedSimulationMode = simMode;
+                _settingsService.Current.DynamicThemeEnabled = false;
+            }
+            else if (path == "ALL")
+            {
+                _settingsService.Current.SimulationModeEnabled = false;
                 _mediaLibrary.ResetSequenceIndex();
             }
             else
             {
+                _settingsService.Current.SimulationModeEnabled = false;
                 var theme = DynamicThemeService.TryLoadThemeFromFolder(path);
                 if (theme != null)
                 {
@@ -901,12 +1305,49 @@ public sealed partial class MainPage : Page
             ComboDisplayMode.IsEnabled = isAllDisplays;
         }
 
+        if (CardPowerOffInactiveDisplays != null)
+        {
+            CardPowerOffInactiveDisplays.IsEnabled = !isAllDisplays;
+            CardPowerOffInactiveDisplays.Description = isAllDisplays
+                ? "Only active when a specific Target Monitor is selected."
+                : "Put inactive monitors into hardware standby via DDC/CI instead of displaying a black screen.";
+        }
+
+        if (PanelDdcCiStatus != null)
+        {
+            if (isAllDisplays)
+            {
+                PanelDdcCiStatus.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                UpdateDdcCiStatusAsync(_settingsService.Current.TargetDisplayIndex);
+            }
+        }
+
         if (PanelPerMonitorRouting != null)
         {
             PanelPerMonitorRouting.Visibility = isIndependentMulti ? Visibility.Visible : Visibility.Collapsed;
         }
 
-        bool widgetsEnabled = ToggleWidgetsEnabled?.IsOn ?? false;
+        bool isSimActive = _settingsService.Current.IsSimulationActive;
+        if (BannerSimWidgetsDisabled != null)
+        {
+            BannerSimWidgetsDisabled.Visibility = isSimActive ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (CardWidgetsEnabled != null)
+        {
+            CardWidgetsEnabled.IsEnabled = !isSimActive;
+            CardWidgetsEnabled.Description = isSimActive
+                ? "Automatically disabled while Fake OS Updates & Simulation Suite is active."
+                : "Show overlay widgets while the screensaver is running.";
+        }
+        if (ToggleWidgetsEnabled != null)
+        {
+            ToggleWidgetsEnabled.IsEnabled = !isSimActive;
+        }
+
+        bool widgetsEnabled = (ToggleWidgetsEnabled?.IsOn ?? false) && !isSimActive;
         if (ComboWidgetTargetDisplay != null)
         {
             ComboWidgetTargetDisplay.IsEnabled = widgetsEnabled && isAllDisplays;
@@ -977,7 +1418,7 @@ public sealed partial class MainPage : Page
 
         if (ToggleWidgetsEnabled != null)
         {
-            bool wOn = ToggleWidgetsEnabled.IsOn;
+            bool wOn = ToggleWidgetsEnabled.IsOn && !_settingsService.Current.IsSimulationActive;
 
             // Clock
             if (ExpanderClockWidget != null) ExpanderClockWidget.IsEnabled = wOn;
@@ -1408,6 +1849,43 @@ public sealed partial class MainPage : Page
 
         s.UseCustomSolarTimes = ToggleCustomSolar.IsOn;
 
+        if (SliderSimStartPercent != null)
+        {
+            s.SimulationStartPercent = Math.Clamp((int)Math.Round(SliderSimStartPercent.Value), 0, 99);
+            if (TxtSimStartPercent != null)
+            {
+                TxtSimStartPercent.Text = $"{s.SimulationStartPercent}%";
+            }
+        }
+        if (ComboSimWhenFinished != null && ComboSimWhenFinished.SelectedIndex >= 0)
+        {
+            s.SimulationWhenFinished = (SimulationFinishAction)ComboSimWhenFinished.SelectedIndex;
+        }
+        if (ComboSimMultiMonitorMode != null && ComboSimMultiMonitorMode.SelectedIndex >= 0)
+        {
+            s.MULTI_MONITOR_MODE = ComboSimMultiMonitorMode.SelectedIndex == 1
+                ? AppSettings.MultiMonitorModeMirror
+                : AppSettings.MultiMonitorModePrimaryOnly;
+        }
+        if (ToggleSimMaskSensitive != null)
+        {
+            s.MASK_SENSITIVE = ToggleSimMaskSensitive.IsOn;
+        }
+        if (ToggleSimEnterBsod != null)
+        {
+            s.SimulationEnterTriggerBsod = ToggleSimEnterBsod.IsOn;
+        }
+        if (SliderSimSpinnerSpeed != null)
+        {
+            s.SimulationSpinnerSpeedSeconds = Math.Round(Math.Clamp(SliderSimSpinnerSpeed.Value, 0.6, 3.0), 2);
+            if (TxtSimSpinnerSpeed != null)
+            {
+                TxtSimSpinnerSpeed.Text = $"{s.SimulationSpinnerSpeedSeconds:F2}s / rot";
+            }
+        }
+        UpdateSimPresetButtonsUI();
+        UpdateSimScheduleSummaryText();
+
         if (ComboSegmentOverride.SelectedIndex >= 0)
         {
             s.SegmentOverride = (SolarSegmentOverride)ComboSegmentOverride.SelectedIndex;
@@ -1475,6 +1953,8 @@ public sealed partial class MainPage : Page
             s.DisableCorner = (HotCornerZone)ComboDisableCorner.SelectedIndex;
         if (TogglePauseOnBattery != null)
             s.PauseOnBattery = TogglePauseOnBattery.IsOn;
+        if (TogglePowerOffInactiveDisplays != null)
+            s.PowerOffInactiveDisplays = TogglePowerOffInactiveDisplays.IsOn;
 
         if (ComboAppTheme.SelectedIndex >= 0)
         {
@@ -2702,6 +3182,511 @@ public sealed partial class MainPage : Page
                 UpdateSourceList();
                 _mediaLibrary.Rescan();
             }
+        }
+    }
+
+    private async void OnAddArtworkFolderClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null || _mediaLibrary == null || DialogAddArtwork == null) return;
+
+        ComboArtworkTargetFolder.Items.Clear();
+        var artworkSources = _mediaLibrary.GetArtworkGallerySources();
+        var standardSources = _mediaLibrary.GetStandardFolderSources();
+
+        // 1. Add existing recognized Artwork Galleries
+        foreach (var art in artworkSources)
+        {
+            ComboArtworkTargetFolder.Items.Add(new ComboBoxItem
+            {
+                Content = $"🎨 {art.DisplayName} ({art.Path})",
+                Tag = art.Path
+            });
+        }
+
+        // 2. Discover any artwork subfolder near configured media folders
+        var checkedDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in _settingsService.Current.MediaFolders)
+        {
+            try
+            {
+                var parent = Directory.GetParent(f)?.FullName;
+                if (!string.IsNullOrEmpty(parent) && checkedDirs.Add(parent))
+                {
+                    var artSubDirs = Directory.GetDirectories(parent, "*art*", SearchOption.TopDirectoryOnly);
+                    foreach (var ad in artSubDirs)
+                    {
+                        if (!artworkSources.Any(a => string.Equals(a.Path, ad, StringComparison.OrdinalIgnoreCase)) &&
+                            !standardSources.Any(s => string.Equals(s.Path, ad, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            var dName = new DirectoryInfo(ad).Name;
+                            ComboArtworkTargetFolder.Items.Add(new ComboBoxItem
+                            {
+                                Content = $"🎨 {dName} ({ad})",
+                                Tag = ad
+                            });
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        // 3. Default Pictures folder
+        string defaultArtworkDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LivelyScreen", "Artworks");
+        bool hasDefault = false;
+        foreach (var item in ComboArtworkTargetFolder.Items)
+        {
+            if (item is ComboBoxItem cbi && cbi.Tag is string p && string.Equals(p, defaultArtworkDir, StringComparison.OrdinalIgnoreCase))
+            {
+                hasDefault = true;
+                break;
+            }
+        }
+        if (!hasDefault)
+        {
+            ComboArtworkTargetFolder.Items.Add(new ComboBoxItem
+            {
+                Content = $"✨ Default: {defaultArtworkDir}",
+                Tag = defaultArtworkDir
+            });
+        }
+
+        // 4. Other standard media folders
+        foreach (var std in standardSources)
+        {
+            bool alreadyInCombo = false;
+            foreach (var item in ComboArtworkTargetFolder.Items)
+            {
+                if (item is ComboBoxItem cbi && cbi.Tag is string p && string.Equals(p, std.Path, StringComparison.OrdinalIgnoreCase))
+                {
+                    alreadyInCombo = true;
+                    break;
+                }
+            }
+            if (!alreadyInCombo)
+            {
+                ComboArtworkTargetFolder.Items.Add(new ComboBoxItem
+                {
+                    Content = $"📁 {std.DisplayName} ({std.Path})",
+                    Tag = std.Path
+                });
+            }
+        }
+
+        // Auto-select preferred folder: prefer an artwork gallery, else default
+        int bestIndex = 0;
+        for (int i = 0; i < ComboArtworkTargetFolder.Items.Count; i++)
+        {
+            if (ComboArtworkTargetFolder.Items[i] is ComboBoxItem cbi && cbi.Content is string c && c.Contains("🎨"))
+            {
+                bestIndex = i;
+                break;
+            }
+        }
+        ComboArtworkTargetFolder.SelectedIndex = bestIndex;
+
+        if (InfoBarArtworkStatus != null) InfoBarArtworkStatus.IsOpen = false;
+        TxtArtworkImagePath.Text = "";
+        BorderArtworkThumbnailPreview.Visibility = Visibility.Collapsed;
+        ImgArtworkThumbnailPreview.Source = null;
+        TxtInputArtworkTitle.Text = "";
+        TxtInputArtworkArtist.Text = "";
+        TxtInputArtworkCredit.Text = "ctto";
+        TxtInputArtworkYear.Text = "";
+
+        DialogAddArtwork.XamlRoot = this.Content.XamlRoot;
+        await DialogAddArtwork.ShowAsync();
+    }
+
+    private void OnBrowseArtworkFolderClicked(object sender, RoutedEventArgs e)
+    {
+        var path = NativeMethods.PickFolder(_windowHandle, "Select or Create Artwork Gallery Folder");
+        if (!string.IsNullOrEmpty(path))
+        {
+            ComboBoxItem? found = null;
+            foreach (var item in ComboArtworkTargetFolder.Items)
+            {
+                if (item is ComboBoxItem cbi && cbi.Tag is string p && string.Equals(p, path, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = cbi;
+                    break;
+                }
+            }
+
+            if (found == null)
+            {
+                var folderName = new DirectoryInfo(path).Name;
+                found = new ComboBoxItem
+                {
+                    Content = $"🎨 {folderName} ({path})",
+                    Tag = path
+                };
+                ComboArtworkTargetFolder.Items.Insert(0, found);
+            }
+
+            ComboArtworkTargetFolder.SelectedItem = found;
+        }
+    }
+
+    private void OnArtworkTargetFolderChanged(object sender, SelectionChangedEventArgs e)
+    {
+    }
+
+    private void OnBrowseArtworkImageClicked(object sender, RoutedEventArgs e)
+    {
+        string filter = "Image Files (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif)\0*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif\0All Files (*.*)\0*.*\0\0";
+        var file = NativeMethods.PickFile(_windowHandle, "Select Artwork Image File", filter);
+        if (!string.IsNullOrEmpty(file) && File.Exists(file))
+        {
+            TxtArtworkImagePath.Text = file;
+
+            try
+            {
+                var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(file));
+                ImgArtworkThumbnailPreview.Source = bitmap;
+                BorderArtworkThumbnailPreview.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex)
+            {
+                App.Log($"Thumbnail preview failed: {ex.Message}");
+            }
+
+            if (string.IsNullOrWhiteSpace(TxtInputArtworkTitle.Text))
+            {
+                TxtInputArtworkTitle.Text = ArtworkService.CleanFilenameToTitle(Path.GetFileNameWithoutExtension(file));
+            }
+
+            string sidecar = Path.ChangeExtension(file, ".json");
+            if (File.Exists(sidecar))
+            {
+                try
+                {
+                    string json = File.ReadAllText(sidecar);
+                    var existingMeta = System.Text.Json.JsonSerializer.Deserialize<ArtworkMetadata>(json);
+                    if (existingMeta != null)
+                    {
+                        if (!string.IsNullOrWhiteSpace(existingMeta.Title))
+                            TxtInputArtworkTitle.Text = existingMeta.Title;
+                        if (!string.IsNullOrWhiteSpace(existingMeta.Artist))
+                            TxtInputArtworkArtist.Text = existingMeta.Artist;
+                        if (!string.IsNullOrWhiteSpace(existingMeta.Credit))
+                            TxtInputArtworkCredit.Text = existingMeta.Credit;
+                        if (!string.IsNullOrWhiteSpace(existingMeta.Year))
+                            TxtInputArtworkYear.Text = existingMeta.Year;
+                    }
+                }
+                catch { }
+            }
+        }
+    }
+
+    private async void OnSaveArtworkClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        var deferral = args.GetDeferral();
+        try
+        {
+            string? imagePath = TxtArtworkImagePath.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+            {
+                args.Cancel = true;
+                if (InfoBarArtworkStatus != null)
+                {
+                    InfoBarArtworkStatus.Message = "Please select a valid image file on disk.";
+                    InfoBarArtworkStatus.IsOpen = true;
+                }
+                return;
+            }
+
+            string? targetFolder = null;
+            if (ComboArtworkTargetFolder.SelectedItem is ComboBoxItem cbi && cbi.Tag is string p)
+            {
+                targetFolder = p;
+            }
+
+            if (string.IsNullOrWhiteSpace(targetFolder))
+            {
+                args.Cancel = true;
+                if (InfoBarArtworkStatus != null)
+                {
+                    InfoBarArtworkStatus.Message = "Please select a target gallery folder.";
+                    InfoBarArtworkStatus.IsOpen = true;
+                }
+                return;
+            }
+
+            var meta = new ArtworkMetadata
+            {
+                Title = string.IsNullOrWhiteSpace(TxtInputArtworkTitle.Text)
+                    ? ArtworkService.CleanFilenameToTitle(Path.GetFileNameWithoutExtension(imagePath))
+                    : TxtInputArtworkTitle.Text.Trim(),
+                Artist = TxtInputArtworkArtist.Text?.Trim(),
+                Credit = TxtInputArtworkCredit.Text?.Trim(),
+                Year = TxtInputArtworkYear.Text?.Trim()
+            };
+
+            string savedPath = await ArtworkService.SaveArtworkEntryAsync(targetFolder, imagePath, meta);
+            App.Log($"Artwork '{meta.Title}' successfully saved to: {savedPath}");
+
+            if (_settingsService != null)
+            {
+                if (!_settingsService.Current.MediaFolders.Contains(targetFolder, StringComparer.OrdinalIgnoreCase))
+                {
+                    _settingsService.Current.MediaFolders.Add(targetFolder);
+                }
+                _settingsService.Current.ActiveSourcePath = targetFolder;
+                _settingsService.Current.DynamicThemeEnabled = false;
+                _settingsService.Save();
+            }
+
+            _mediaLibrary?.Rescan();
+            UpdateSourceList();
+            UpdateControlStates();
+        }
+        catch (Exception ex)
+        {
+            args.Cancel = true;
+            if (InfoBarArtworkStatus != null)
+            {
+                InfoBarArtworkStatus.Message = $"Save failed: {ex.Message}";
+                InfoBarArtworkStatus.IsOpen = true;
+            }
+            App.Log($"Error saving artwork: {ex}");
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
+    private ArtworkManageItem? _currentlyEditingArtwork;
+
+    private async void OnArtworkSplitButtonClicked(SplitButton sender, SplitButtonClickEventArgs args)
+    {
+        await OpenManageArtworksDialogAsync(null);
+    }
+
+    private async void OnOpenManageArtworksClicked(object sender, RoutedEventArgs e)
+    {
+        await OpenManageArtworksDialogAsync(null);
+    }
+
+    private async void OnManageArtworksFromCardClicked(object sender, RoutedEventArgs e)
+    {
+        string? folderPath = (sender as FrameworkElement)?.Tag as string;
+        await OpenManageArtworksDialogAsync(folderPath);
+    }
+
+    private async Task OpenManageArtworksDialogAsync(string? preferredFolder)
+    {
+        if (_settingsService == null || _mediaLibrary == null || DialogManageArtworks == null) return;
+
+        ComboManageGallerySelector.Items.Clear();
+        var artworkSources = _mediaLibrary.GetArtworkGallerySources();
+
+        var allFolders = new HashSet<string>(_settingsService.Current.MediaFolders, StringComparer.OrdinalIgnoreCase);
+        foreach (var art in artworkSources) allFolders.Add(art.Path);
+
+        foreach (var f in allFolders)
+        {
+            if (ArtworkService.IsArtworkFolder(f))
+            {
+                var folderName = new DirectoryInfo(f).Name;
+                ComboManageGallerySelector.Items.Add(new ComboBoxItem
+                {
+                    Content = $"🎨 {folderName} ({f})",
+                    Tag = f
+                });
+            }
+        }
+
+        if (ComboManageGallerySelector.Items.Count == 0)
+        {
+            string defaultDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "LivelyScreen", "Artworks");
+            ComboManageGallerySelector.Items.Add(new ComboBoxItem
+            {
+                Content = $"🎨 Artworks ({defaultDir})",
+                Tag = defaultDir
+            });
+        }
+
+        int selectedIndex = 0;
+        string activeFolder = preferredFolder ?? _settingsService.Current.ActiveSourcePath ?? "";
+        for (int i = 0; i < ComboManageGallerySelector.Items.Count; i++)
+        {
+            if (ComboManageGallerySelector.Items[i] is ComboBoxItem cbi && cbi.Tag is string p &&
+                string.Equals(p, activeFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                selectedIndex = i;
+                break;
+            }
+        }
+        ComboManageGallerySelector.SelectedIndex = selectedIndex;
+
+        PanelManageList.Visibility = Visibility.Visible;
+        PanelManageEdit.Visibility = Visibility.Collapsed;
+        DialogManageArtworks.Title = "Manage Gallery Artworks";
+        DialogManageArtworks.PrimaryButtonText = "+ Add Artwork";
+        DialogManageArtworks.CloseButtonText = "Done";
+        if (InfoBarManageEditStatus != null) InfoBarManageEditStatus.IsOpen = false;
+
+        string currentFolder = (ComboManageGallerySelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        LoadManageArtworksList(currentFolder);
+
+        DialogManageArtworks.XamlRoot = this.Content.XamlRoot;
+        await DialogManageArtworks.ShowAsync();
+    }
+
+    private void OnManageGallerySelectorChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ComboManageGallerySelector?.SelectedItem is ComboBoxItem cbi && cbi.Tag is string folder)
+        {
+            LoadManageArtworksList(folder);
+        }
+    }
+
+    private void LoadManageArtworksList(string folderPath)
+    {
+        if (ListManageArtworks == null) return;
+
+        var items = ArtworkService.GetGalleryArtworks(folderPath);
+        ListManageArtworks.ItemsSource = items;
+
+        if (TxtManageArtworksCount != null)
+        {
+            TxtManageArtworksCount.Text = items.Count == 1 ? "1 artwork found in gallery" : $"{items.Count} artworks found in gallery";
+        }
+    }
+
+    private void OnOpenGalleryFolderInExplorerClicked(object sender, RoutedEventArgs e)
+    {
+        if (ComboManageGallerySelector?.SelectedItem is ComboBoxItem cbi && cbi.Tag is string folder && Directory.Exists(folder))
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = folder,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                App.Log($"Error opening folder in Explorer: {ex.Message}");
+            }
+        }
+    }
+
+    private async void OnManageDialogPrimaryClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        if (PanelManageEdit.Visibility == Visibility.Visible)
+        {
+            // In Edit View: Primary button is "Save Changes"
+            args.Cancel = true;
+            await SaveManageEditChangesAsync();
+        }
+        else
+        {
+            // In List View: Primary button is "+ Add Artwork"
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(200);
+                OnAddArtworkFolderClicked(this, new RoutedEventArgs());
+            });
+        }
+    }
+
+    private void OnManageDialogCloseClicked(ContentDialog sender, ContentDialogButtonClickEventArgs args)
+    {
+        if (PanelManageEdit.Visibility == Visibility.Visible)
+        {
+            // In Edit View: Close button is "Back to List"
+            args.Cancel = true;
+            DialogManageArtworks.Title = "Manage Gallery Artworks";
+            DialogManageArtworks.PrimaryButtonText = "+ Add Artwork";
+            DialogManageArtworks.CloseButtonText = "Done";
+            PanelManageList.Visibility = Visibility.Visible;
+            PanelManageEdit.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnEditArtworkFromListClicked(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is ArtworkManageItem item)
+        {
+            _currentlyEditingArtwork = item;
+
+            TxtManageEditTitle.Text = item.Title;
+            TxtManageEditArtist.Text = item.Artist;
+            TxtManageEditCredit.Text = item.Credit;
+            TxtManageEditYear.Text = item.Year;
+            TxtManageEditFileName.Text = $"{item.FileName} • {item.FullImagePath}";
+
+            try
+            {
+                ImgManageEditPreview.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(item.FullImagePath));
+            }
+            catch { }
+
+            DialogManageArtworks.Title = $"Edit: {item.Title}";
+            DialogManageArtworks.PrimaryButtonText = "Save Changes";
+            DialogManageArtworks.CloseButtonText = "Back to List";
+            PanelManageList.Visibility = Visibility.Collapsed;
+            PanelManageEdit.Visibility = Visibility.Visible;
+            if (InfoBarManageEditStatus != null) InfoBarManageEditStatus.IsOpen = false;
+        }
+    }
+
+    private async Task SaveManageEditChangesAsync()
+    {
+        if (_currentlyEditingArtwork == null) return;
+
+        try
+        {
+            var meta = new ArtworkMetadata
+            {
+                Title = string.IsNullOrWhiteSpace(TxtManageEditTitle.Text)
+                    ? ArtworkService.CleanFilenameToTitle(Path.GetFileNameWithoutExtension(_currentlyEditingArtwork.FileName))
+                    : TxtManageEditTitle.Text.Trim(),
+                Artist = TxtManageEditArtist.Text?.Trim(),
+                Credit = TxtManageEditCredit.Text?.Trim(),
+                Year = TxtManageEditYear.Text?.Trim()
+            };
+
+            await ArtworkService.SaveArtworkEntryAsync(_currentlyEditingArtwork.GalleryFolder, _currentlyEditingArtwork.FullImagePath, meta);
+            App.Log($"Artwork '{meta.Title}' successfully updated.");
+
+            _mediaLibrary?.Rescan();
+            UpdateSourceList();
+
+            LoadManageArtworksList(_currentlyEditingArtwork.GalleryFolder);
+
+            DialogManageArtworks.Title = "Manage Gallery Artworks";
+            DialogManageArtworks.PrimaryButtonText = "+ Add Artwork";
+            DialogManageArtworks.CloseButtonText = "Done";
+            PanelManageList.Visibility = Visibility.Visible;
+            PanelManageEdit.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            if (InfoBarManageEditStatus != null)
+            {
+                InfoBarManageEditStatus.Message = $"Update failed: {ex.Message}";
+                InfoBarManageEditStatus.IsOpen = true;
+            }
+            App.Log($"Error updating artwork: {ex.Message}");
+        }
+    }
+
+    private async void OnDeleteArtworkFromListClicked(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is ArtworkManageItem item)
+        {
+            await ArtworkService.DeleteArtworkEntryAsync(item.GalleryFolder, item.FileName, deleteImageFile: false);
+            App.Log($"Artwork '{item.Title}' ({item.FileName}) removed from gallery metadata.");
+
+            _mediaLibrary?.Rescan();
+            UpdateSourceList();
+            LoadManageArtworksList(item.GalleryFolder);
         }
     }
 

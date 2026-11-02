@@ -18,9 +18,9 @@ public sealed partial class ScreensaverWindow : Window
 {
     private readonly SettingsService _settingsService;
     private readonly MediaLibrary _mediaLibrary;
-    private readonly RectInt32 _bounds;
-    private readonly bool _isBlackout;
-    private readonly bool _isPrimary;
+    private RectInt32 _bounds;
+    private bool _isBlackout;
+    private bool _isPrimary;
     private readonly bool _isSpan;
 
     private Windows.Foundation.Point? _initialMousePos;
@@ -49,12 +49,15 @@ public sealed partial class ScreensaverWindow : Window
     private Storyboard? _kenBurnsStoryboardB;
     private NativeMethods.SubclassProc? _borderlessSubclassProc;
 
-    public bool IsMaster { get; }
-    public int DisplayIndex { get; }
+    public bool IsMaster { get; set; }
+    public int DisplayIndex { get; set; }
+    public ulong DisplayIdValue { get; set; }
+    public RectInt32 MonitorBounds => _bounds;
     public bool IsBlackout => _isBlackout;
-    public string? AssignedSourcePath { get; }
+    public string? AssignedSourcePath { get; set; }
     public MediaItem? CurrentMediaItem { get; private set; }
     public event Action? DismissRequested;
+    public event Action? DisplayConfigurationChanged;
     public event Action<MediaItem, bool>? MediaBroadcastRequested;
 
     public ScreensaverWindow(
@@ -129,16 +132,22 @@ public sealed partial class ScreensaverWindow : Window
         };
 
         _currentShufflePosition = _settingsService.Current.ClockPosition;
-        ApplyClockPosition(_currentShufflePosition);
-        UpdateClockWidget();
-        bool canShowWidgets = CanDisplayWidgets();
-        if (canShowWidgets && !_isBlackout)
+        if (!_isBlackout)
         {
-            _clockTimer.Start();
-            StartClockShuffleTimer();
-            StartOledShiftTimer();
+            ApplyClockPosition(_currentShufflePosition);
+            UpdateClockWidget();
+            bool canShowWidgets = CanDisplayWidgets();
+            if (canShowWidgets)
+            {
+                _clockTimer.Start();
+                StartClockShuffleTimer();
+                StartOledShiftTimer();
+            }
+            if (_settingsService.Current.GetEffectiveSimulationMode(AssignedSourcePath) == SimulationModeType.None)
+            {
+                StartBlackoutStageTimer();
+            }
         }
-        StartBlackoutStageTimer();
 
         try
         {
@@ -160,6 +169,7 @@ public sealed partial class ScreensaverWindow : Window
         {
             _isClosing = true;
             DismissRequested = null;
+            DisplayConfigurationChanged = null;
             MediaBroadcastRequested = null;
             _photoTimer.Stop();
             _videoWatchdogTimer.Stop();
@@ -168,6 +178,7 @@ public sealed partial class ScreensaverWindow : Window
             _oledShiftTimer.Stop();
             _blackoutStageTimer.Stop();
             _taskbarWatchdogTimer.Stop();
+            SimulationOverlayControl?.StopSimulation();
             _kenBurnsStoryboardA?.Stop();
             _kenBurnsStoryboardB?.Stop();
             _currentTransition?.Stop();
@@ -226,47 +237,16 @@ public sealed partial class ScreensaverWindow : Window
 
                 NativeMethods.SetLayeredWindowAttributes(hWnd, 0, 0, NativeMethods.LWA_ALPHA);
 
-                // Universal 2px overscan pushes any potential 1px DWM window border completely off the physical screen
-                const int overscan = 2;
-                int x = _bounds.X - overscan;
-                int y = _bounds.Y - overscan;
-                int w = _bounds.Width + (overscan * 2);
-                int h = _bounds.Height + (overscan * 2);
-
-                if (_isSpan)
-                {
-                    const int spanExtra = 2;
-                    x -= spanExtra;
-                    y -= spanExtra;
-                    w += spanExtra * 2;
-                    h += spanExtra * 2;
-                }
-
-                // Set exact display bounds and bring to topmost
-                NativeMethods.SetWindowPos(
-                    hWnd,
-                    NativeMethods.HWND_TOPMOST,
-                    x,
-                    y,
-                    w,
-                    h,
-                    NativeMethods.SWP_FRAMECHANGED | NativeMethods.SWP_SHOWWINDOW
-                );
+                ApplyWindowBoundsToHwnd(hWnd);
 
                 // Subclass window procedure to intercept WM_NCCALCSIZE and WM_NCACTIVATE so OS never draws non-client frame
                 _borderlessSubclassProc = BorderlessSubclass;
                 NativeMethods.SetWindowSubclass(hWnd, _borderlessSubclassProc, (UIntPtr)101, UIntPtr.Zero);
 
-                // Set explicit GDI rectangular region which forces DWM to completely drop all borders and drop shadows
-                IntPtr hRgn = NativeMethods.CreateRectRgn(0, 0, w, h);
-                if (hRgn != IntPtr.Zero)
-                {
-                    NativeMethods.SetWindowRgn(hWnd, hRgn, true);
-                }
-
                 // Tell Windows Shell to treat window as fullscreen to suppress taskbar
                 NativeMethods.MarkFullscreen(hWnd, true);
 
+                SetCursorHidden(true);
                 if (IsMaster || _isPrimary)
                 {
                     NativeMethods.ForceForegroundWindow(hWnd);
@@ -286,16 +266,7 @@ public sealed partial class ScreensaverWindow : Window
             }
             StartFadeIn(hWnd);
 
-            if (_isBlackout)
-            {
-                NoMediaPrompt.Visibility = Visibility.Collapsed;
-                LayerA.Visibility = Visibility.Collapsed;
-                LayerB.Visibility = Visibility.Collapsed;
-            }
-            else if (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone)
-            {
-                AdvanceToNextMedia(initial: true);
-            }
+            ApplyActiveMonitorPresentation(initialMedia: true);
         }
         catch (Exception ex)
         {
@@ -303,15 +274,190 @@ public sealed partial class ScreensaverWindow : Window
         }
     }
 
+    private void ApplyWindowBoundsToHwnd(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero) return;
+
+        // Universal 2px overscan pushes any potential 1px DWM window border completely off the physical screen
+        const int overscan = 2;
+        int x = _bounds.X - overscan;
+        int y = _bounds.Y - overscan;
+        int w = _bounds.Width + (overscan * 2);
+        int h = _bounds.Height + (overscan * 2);
+
+        if (_isSpan)
+        {
+            const int spanExtra = 2;
+            x -= spanExtra;
+            y -= spanExtra;
+            w += spanExtra * 2;
+            h += spanExtra * 2;
+        }
+
+        NativeMethods.SetWindowPos(
+            hWnd,
+            NativeMethods.HWND_TOPMOST,
+            x,
+            y,
+            w,
+            h,
+            NativeMethods.SWP_FRAMECHANGED | NativeMethods.SWP_SHOWWINDOW
+        );
+
+        IntPtr hRgn = NativeMethods.CreateRectRgn(0, 0, w, h);
+        if (hRgn != IntPtr.Zero)
+        {
+            NativeMethods.SetWindowRgn(hWnd, hRgn, true);
+        }
+    }
+
+    private void ApplyActiveMonitorPresentation(bool initialMedia)
+    {
+        var simMode = _settingsService.Current.GetEffectiveSimulationMode(AssignedSourcePath);
+        if (_isBlackout)
+        {
+            _photoTimer.Stop();
+            _videoWatchdogTimer.Stop();
+            _clockTimer.Stop();
+            _clockShuffleTimer.Stop();
+            _oledShiftTimer.Stop();
+            _blackoutStageTimer.Stop();
+
+            NoMediaPrompt.Visibility = Visibility.Collapsed;
+            LayerA.Visibility = Visibility.Collapsed;
+            LayerB.Visibility = Visibility.Collapsed;
+            if (OverlayWidgetsLayer != null) OverlayWidgetsLayer.Visibility = Visibility.Collapsed;
+            if (OverlayQuoteWidget != null) OverlayQuoteWidget.Visibility = Visibility.Collapsed;
+            if (BorderBatteryBadge != null) BorderBatteryBadge.Visibility = Visibility.Collapsed;
+            if (BorderMediaInfo != null) BorderMediaInfo.Visibility = Visibility.Collapsed;
+            if (BorderArtworkPlaque != null) BorderArtworkPlaque.Visibility = Visibility.Collapsed;
+            if (SimulationOverlayControl != null)
+            {
+                SimulationOverlayControl.StopSimulation();
+                SimulationOverlayControl.Visibility = Visibility.Collapsed;
+            }
+        }
+        else if (simMode != SimulationModeType.None)
+        {
+            _photoTimer.Stop();
+            _videoWatchdogTimer.Stop();
+            _clockTimer.Stop();
+            _clockShuffleTimer.Stop();
+            _oledShiftTimer.Stop();
+            _blackoutStageTimer.Stop();
+
+            NoMediaPrompt.Visibility = Visibility.Collapsed;
+            LayerA.Visibility = Visibility.Collapsed;
+            LayerB.Visibility = Visibility.Collapsed;
+            if (OledShiftContainer != null) OledShiftContainer.Visibility = Visibility.Collapsed;
+            if (OverlayWidgetsLayer != null) OverlayWidgetsLayer.Visibility = Visibility.Collapsed;
+            if (OverlayQuoteWidget != null) OverlayQuoteWidget.Visibility = Visibility.Collapsed;
+            if (BorderBatteryBadge != null) BorderBatteryBadge.Visibility = Visibility.Collapsed;
+            if (BorderMediaInfo != null) BorderMediaInfo.Visibility = Visibility.Collapsed;
+            if (BorderArtworkPlaque != null) BorderArtworkPlaque.Visibility = Visibility.Collapsed;
+            if (SimulationOverlayControl != null)
+            {
+                SimulationOverlayControl.RequestDismiss -= TriggerDismiss;
+                SimulationOverlayControl.RequestDismiss += TriggerDismiss;
+                SimulationOverlayControl.Visibility = Visibility.Visible;
+                SimulationOverlayControl.StartSimulation(simMode, _settingsService.Current, joinExistingSession: true);
+            }
+        }
+        else
+        {
+            if (SimulationOverlayControl != null)
+            {
+                SimulationOverlayControl.StopSimulation();
+                SimulationOverlayControl.Visibility = Visibility.Collapsed;
+            }
+            LayerA.Visibility = Visibility.Visible;
+            LayerB.Visibility = Visibility.Visible;
+            if (OledShiftContainer != null) OledShiftContainer.Visibility = Visibility.Visible;
+            UpdateClockWidget();
+            if (CanDisplayWidgets())
+            {
+                _clockTimer.Start();
+                StartClockShuffleTimer();
+                StartOledShiftTimer();
+            }
+            StartBlackoutStageTimer();
+
+            if (initialMedia && (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone))
+            {
+                AdvanceToNextMedia(initial: true);
+            }
+        }
+    }
+
+    public void ReconfigureMonitor(
+        RectInt32 newBounds,
+        bool isPrimary,
+        bool isBlackout,
+        bool isMaster,
+        int displayIndex,
+        string? assignedSourcePath)
+    {
+        if (_isClosing) return;
+
+        bool boundsChanged = _bounds.X != newBounds.X ||
+                             _bounds.Y != newBounds.Y ||
+                             _bounds.Width != newBounds.Width ||
+                             _bounds.Height != newBounds.Height;
+        bool blackoutChanged = _isBlackout != isBlackout;
+
+        _bounds = newBounds;
+        _isPrimary = isPrimary;
+        _isBlackout = isBlackout;
+        IsMaster = isMaster;
+        DisplayIndex = displayIndex;
+        AssignedSourcePath = assignedSourcePath;
+
+        try
+        {
+            if (boundsChanged)
+            {
+                AppWindow.MoveAndResize(_bounds);
+                if (_windowHandle != IntPtr.Zero)
+                {
+                    ApplyWindowBoundsToHwnd(_windowHandle);
+                }
+            }
+
+            if (blackoutChanged)
+            {
+                ApplyActiveMonitorPresentation(initialMedia: !_isBlackout && CurrentMediaItem == null);
+            }
+            else if (!_isBlackout)
+            {
+                SimulationOverlayControl?.RecomputeLayout();
+                UpdateClockWidget();
+            }
+
+            SetCursorHidden(true);
+        }
+        catch (Exception ex)
+        {
+            App.Log($"ReconfigureMonitor error on display {displayIndex}: {ex.Message}");
+        }
+    }
+
     private IntPtr BorderlessSubclass(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, UIntPtr uIdSubclass, UIntPtr dwRefData)
     {
         const uint WM_ACTIVATE = 0x0006;
+        const uint WM_SETCURSOR = 0x0020;
         const uint WM_NCCALCSIZE = 0x0083;
         const uint WM_NCPAINT = 0x0085;
         const uint WM_NCACTIVATE = 0x0086;
 
         switch (uMsg)
         {
+            case WM_SETCURSOR:
+                if (!_isClosing)
+                {
+                    NativeMethods.SetCursor(IntPtr.Zero);
+                    return new IntPtr(1);
+                }
+                break;
             case WM_ACTIVATE:
                 if (wParam == IntPtr.Zero && !_isClosing)
                 {
@@ -321,7 +467,10 @@ public sealed partial class ScreensaverWindow : Window
                 break;
 
             case (uint)NativeMethods.WM_DISPLAYCHANGE:
-                TriggerDismiss();
+                if (!_isClosing)
+                {
+                    DispatcherQueue.TryEnqueue(() => DisplayConfigurationChanged?.Invoke());
+                }
                 break;
 
             case NativeMethods.WM_POWERBROADCAST:
@@ -468,6 +617,7 @@ public sealed partial class ScreensaverWindow : Window
         }
 
         UpdateMediaInfoPill(item);
+        UpdateArtworkPlaque(item);
         if (_windowHandle != IntPtr.Zero && !_isClosing)
         {
             NativeMethods.SuppressTaskbars(_windowHandle);
@@ -1001,6 +1151,13 @@ public sealed partial class ScreensaverWindow : Window
     private void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if ((DateTime.UtcNow - _activationTime).TotalSeconds < 0.5) return;
+        if (SimulationOverlayControl != null &&
+            SimulationOverlayControl.Visibility == Visibility.Visible &&
+            SimulationOverlayControl.HandleKeyDown(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
         App.Log("Screensaver dismissed by key press");
         TriggerDismiss();
     }
@@ -1015,12 +1172,81 @@ public sealed partial class ScreensaverWindow : Window
         });
     }
 
-    public void FadeOutAndClose(Action? onClosed = null)
+    private static bool _cursorHiddenState = false;
+
+    internal static void SetCursorHidden(bool hide)
+    {
+        try
+        {
+            if (hide && !_cursorHiddenState)
+            {
+                _cursorHiddenState = true;
+                int guard = 0;
+                while (NativeMethods.ShowCursor(false) >= 0 && guard++ < 10) { }
+                NativeMethods.SetCursor(IntPtr.Zero);
+            }
+            else if (!hide && _cursorHiddenState)
+            {
+                _cursorHiddenState = false;
+                int guard = 0;
+                while (NativeMethods.ShowCursor(true) < 0 && guard++ < 10) { }
+            }
+        }
+        catch { }
+    }
+
+    public void CloseImmediately()
     {
         if (_isClosing) return;
         _isClosing = true;
 
         DismissRequested = null;
+        DisplayConfigurationChanged = null;
+        MediaBroadcastRequested = null;
+
+        _photoTimer.Stop();
+        _videoWatchdogTimer.Stop();
+        _clockTimer.Stop();
+        _clockShuffleTimer.Stop();
+        _oledShiftTimer.Stop();
+        _blackoutStageTimer.Stop();
+        _taskbarWatchdogTimer.Stop();
+
+        SimulationOverlayControl?.StopSimulation();
+        _kenBurnsStoryboardA?.Stop();
+        _kenBurnsStoryboardB?.Stop();
+        _currentTransition?.Stop();
+        UnloadLayer(ImageA, VideoA, isLayerA: true);
+        UnloadLayer(ImageB, VideoB, isLayerA: false);
+
+        try
+        {
+            var hWnd = _windowHandle != IntPtr.Zero ? _windowHandle : WindowNative.GetWindowHandle(this);
+            if (hWnd != IntPtr.Zero)
+            {
+                NativeMethods.MarkFullscreen(hWnd, false);
+                if (_borderlessSubclassProc != null)
+                {
+                    NativeMethods.RemoveWindowSubclass(hWnd, _borderlessSubclassProc, (UIntPtr)101);
+                    _borderlessSubclassProc = null;
+                }
+            }
+            Close();
+        }
+        catch (Exception ex)
+        {
+            App.Log($"Error during CloseImmediately: {ex.Message}");
+        }
+    }
+
+    public void FadeOutAndClose(Action? onClosed = null)
+    {
+        if (_isClosing) return;
+        _isClosing = true;
+        SetCursorHidden(false);
+
+        DismissRequested = null;
+        DisplayConfigurationChanged = null;
         MediaBroadcastRequested = null;
 
         if (IsMaster)
@@ -1036,6 +1262,7 @@ public sealed partial class ScreensaverWindow : Window
         _blackoutStageTimer.Stop();
         _taskbarWatchdogTimer.Stop();
 
+        SimulationOverlayControl?.StopSimulation();
         _kenBurnsStoryboardA?.Stop();
         _kenBurnsStoryboardB?.Stop();
         _currentTransition?.Stop();
@@ -1103,6 +1330,10 @@ public sealed partial class ScreensaverWindow : Window
     private bool CanDisplayWidgets()
     {
         var s = _settingsService.Current;
+        if (s.IsSimulationActive || s.GetEffectiveSimulationMode(AssignedSourcePath) != SimulationModeType.None)
+        {
+            return false;
+        }
 
         // When a specific display is targeted (not All Displays), show widgets on that targeted active monitor
         if (s.TargetDisplayIndex >= 0)
@@ -1426,7 +1657,7 @@ public sealed partial class ScreensaverWindow : Window
         if (BorderMediaInfo == null || TxtMediaInfo == null) return;
 
         var s = _settingsService.Current;
-        bool canShow = CanDisplayWidgets() && s.ShowMediaInfoPill && !_isBlackout;
+        bool canShow = CanDisplayWidgets() && s.ShowMediaInfoPill && !_isBlackout && (item.Artwork == null || !item.Artwork.HasDisplayableInfo);
         if (!canShow)
         {
             BorderMediaInfo.Visibility = Visibility.Collapsed;
@@ -1458,6 +1689,68 @@ public sealed partial class ScreensaverWindow : Window
         };
         var sb = new Storyboard();
         Storyboard.SetTarget(anim, BorderMediaInfo);
+        Storyboard.SetTargetProperty(anim, "Opacity");
+        sb.Children.Add(anim);
+        sb.Begin();
+    }
+
+    private void UpdateArtworkPlaque(MediaItem item)
+    {
+        if (BorderArtworkPlaque == null || TxtArtworkTitle == null || TxtArtworkCredit == null) return;
+
+        var artwork = item.Artwork;
+        if (_isBlackout || artwork == null || !artwork.HasDisplayableInfo)
+        {
+            BorderArtworkPlaque.Visibility = Visibility.Collapsed;
+            BorderArtworkPlaque.Opacity = 0;
+            return;
+        }
+
+        string title = artwork.Title ?? "";
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            if (!title.StartsWith("\"") && !title.EndsWith("\""))
+            {
+                title = $"\"{title}\"";
+            }
+        }
+        else
+        {
+            string cleanName = LivelyScreen.Services.ArtworkService.CleanFilenameToTitle(System.IO.Path.GetFileNameWithoutExtension(item.FilePath));
+            title = $"\"{cleanName}\"";
+        }
+
+        string credit = artwork.GetFormattedCredit();
+
+        TxtArtworkTitle.Text = title;
+        if (!string.IsNullOrWhiteSpace(credit))
+        {
+            TxtArtworkCredit.Text = credit;
+            TxtArtworkCredit.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            TxtArtworkCredit.Visibility = Visibility.Collapsed;
+        }
+
+        if (BorderMediaInfo != null)
+        {
+            BorderMediaInfo.Visibility = Visibility.Collapsed;
+            BorderMediaInfo.Opacity = 0;
+        }
+
+        BorderArtworkPlaque.Opacity = 0;
+        BorderArtworkPlaque.Visibility = Visibility.Visible;
+
+        var anim = new DoubleAnimation
+        {
+            From = 0.0,
+            To = 1.0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(600)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var sb = new Storyboard();
+        Storyboard.SetTarget(anim, BorderArtworkPlaque);
         Storyboard.SetTargetProperty(anim, "Opacity");
         sb.Children.Add(anim);
         sb.Begin();

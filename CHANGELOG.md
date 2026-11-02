@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.8] - 2026-11-03
+
+### Added
+- **Authentic Fake OS Update & Crash Screens**: Pixel-accurate screens for Windows 10/11, macOS, Ubuntu, and ChromeOS with measured 6-dot PCHIP spinner easing, dynamic crash dump percentage climbing, and reboot sequence transitions.
+- **Synchronized Multi-Monitor Support**: Added `MULTI_MONITOR_MODE` supporting `primary_only` (black secondary screens) and `mirror` (synchronized clock, seed, percentage, and independent per-monitor resolution scaling).
+- **Real-Time SOC / System Monitor Terminal**: Replaced old simulated CyberOps terminal with a 100% real hardware telemetry dashboard via Win2D, DXGI, PDH, and NTDLL with live process inspection, connection tracking, and snapshot-diff event logging.
+- **Data Privacy Mode**: Added `MASK_SENSITIVE` setting to mask hostnames, usernames, MAC addresses, and IP octets in the telemetry dashboard.
+- **Automated Dashboard Test Suite**: Added xUnit test project covering formatters, ring buffers, and diff event emission.
+
 ## [1.0.7] - 2026-11-01
 
 ### Added

@@ -15,6 +15,7 @@ public class MediaItem
     public MediaType Type { get; set; }
     public bool IsVideo => Type == MediaType.Video;
     public bool IsImage => Type == MediaType.Image;
+    public ArtworkMetadata? Artwork { get; set; }
 
     public MediaItem(string filePath, MediaType type)
     {
@@ -30,8 +31,12 @@ public class MediaSourceItem
     public string DisplayName { get; set; } = string.Empty;
     public bool IsAllSources { get; set; }
     public bool IsDynamicTheme { get; set; }
+    public bool IsArtworkGallery { get; set; }
     public string BadgeText { get; set; } = string.Empty;
     public string Glyph { get; set; } = "\uE8B7";
+    public Microsoft.UI.Xaml.Media.Brush? PreviewBackground { get; set; }
+    public Microsoft.UI.Xaml.Media.ImageSource? LogoImage { get; set; }
+    public string PreviewSubtext { get; set; } = string.Empty;
     public string ItemCountText { get; set; } = string.Empty;
     public string PathText { get; set; } = string.Empty;
     public string DetailsText { get; set; } = string.Empty;
@@ -40,6 +45,7 @@ public class MediaSourceItem
     public string ActionButtonText => IsActive ? "✓ Active" : "Set Active";
     public Visibility ActiveBadgeVisibility => IsActive ? Visibility.Visible : Visibility.Collapsed;
     public Visibility RemoveVisibility => IsAllSources ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility ArtworkManageVisibility => IsArtworkGallery ? Visibility.Visible : Visibility.Collapsed;
     public SourceProfile Profile { get; set; } = new();
     public MediaFitMode FitMode
     {

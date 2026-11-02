@@ -115,6 +115,34 @@ public enum QuoteSourceType
     OnlineUrl = 2
 }
 
+public enum SimulationModeType
+{
+    None = 0,
+    CyberOpsTerminal = 1,
+    Windows11Update = 2,
+    Windows10Update = 3,
+    MacOSUpdate = 4,
+    UbuntuUpdate = 5,
+    ChromeOSUpdate = 6,
+    RandomOSUpdate = 7
+}
+
+public enum SimulationSpeedMode
+{
+    Realistic = 0, // ~1% per 25s
+    Moderate = 1,  // ~1% per 5s
+    Fast = 2,      // ~1% per 1s
+    Frozen99 = 3   // Locked at 99%
+}
+
+public enum SimulationFinishAction
+{
+    RebootLoop = 0,        // Simulated reboot with OS logo, then loops from Start %
+    HoldAt99 = 1,          // Freezes at 99% forever
+    HoldAt100 = 2,         // Holds at 100% complete
+    DismissScreensaver = 3 // Automatically exits screensaver at 100%
+}
+
 public class AppSettings
 {
     public AppThemeMode ThemePreference { get; set; } = AppThemeMode.System;
@@ -130,6 +158,7 @@ public class AppSettings
 
     public MonitorMode DisplayMode { get; set; } = MonitorMode.Independent;
     public int TargetDisplayIndex { get; set; } = -1; // -1 = All Displays, 0 = Monitor 1, 1 = Monitor 2...
+    public bool PowerOffInactiveDisplays { get; set; } = false;
     public List<string> MediaFolders { get; set; } = new();
     public string ActiveSourcePath { get; set; } = "ALL"; // "ALL" or specific folder path
     public Dictionary<int, string> PerMonitorSourcePath { get; set; } = new();
@@ -192,6 +221,84 @@ public class AppSettings
     public string CustomSunriseTime { get; set; } = "06:00";
     public string CustomSunsetTime { get; set; } = "18:00";
     public SolarSegmentOverride SegmentOverride { get; set; } = SolarSegmentOverride.AutoRealTime;
+
+    // Fake OS Updates & CyberOps Simulation Suite
+    public const string MultiMonitorModePrimaryOnly = "primary_only";
+    public const string MultiMonitorModeMirror = "mirror";
+
+    public bool SimulationModeEnabled { get; set; } = false;
+    public bool MASK_SENSITIVE { get; set; } = false;
+    public bool SimulationMaskSensitive
+    {
+        get => MASK_SENSITIVE;
+        set => MASK_SENSITIVE = value;
+    }
+    public string MULTI_MONITOR_MODE { get; set; } = MultiMonitorModePrimaryOnly;
+    public string SimulationMultiMonitorMode
+    {
+        get => string.Equals(MULTI_MONITOR_MODE, MultiMonitorModeMirror, StringComparison.OrdinalIgnoreCase)
+            ? MultiMonitorModeMirror
+            : MultiMonitorModePrimaryOnly;
+        set => MULTI_MONITOR_MODE = string.Equals(value, MultiMonitorModeMirror, StringComparison.OrdinalIgnoreCase)
+            ? MultiMonitorModeMirror
+            : MultiMonitorModePrimaryOnly;
+    }
+    public SimulationModeType SelectedSimulationMode { get; set; } = SimulationModeType.CyberOpsTerminal;
+    public int SimulationStartPercent { get; set; } = 7;
+    public int SimulationDurationMinutes { get; set; } = 15;
+    public bool SimulationIsCustomDuration { get; set; } = false;
+    public int SimulationStartDelaySeconds { get; set; } = 0;
+    public SimulationFinishAction SimulationWhenFinished { get; set; } = SimulationFinishAction.RebootLoop;
+    public bool SimulationShowLogoOnUpdate { get; set; } = true;
+    public SimulationSpeedMode SimulationSpeed { get; set; } = SimulationSpeedMode.Realistic;
+    public bool SimulationEnterTriggerBsod { get; set; } = true;
+    public double SimulationSpinnerSpeedSeconds { get; set; } = 1.75; // 1.0 - 1.3s per rotation default
+    public string SimulationBsodStopCode { get; set; } = "CRITICAL_PROCESS_DIED";
+    public string SimulationBsodFailedDriver { get; set; } = "ntoskrnl.exe";
+    public string SimulationBsodMainMessage { get; set; } = "Your device ran into a problem and needs to restart.";
+    public string SimulationBsodSecondaryMessage { get; set; } = "We're just collecting some error info, and then we'll restart for you.";
+    public string SimulationCustomUpdateLine1 { get; set; } = "";
+    public string SimulationCustomUpdateLine2 { get; set; } = "";
+    public string SimulationCustomUpdateBottomText { get; set; } = "";
+
+    public bool IsSimulationActive =>
+        SimulationModeEnabled ||
+        (!string.IsNullOrEmpty(ActiveSourcePath) && ActiveSourcePath.StartsWith("SIM:", StringComparison.OrdinalIgnoreCase));
+
+    public SimulationModeType GetEffectiveSimulationMode(string? overrideSourcePath = null)
+    {
+        if (TryParseSimulationSource(overrideSourcePath, out var overrideMode))
+            return overrideMode;
+        if (TryParseSimulationSource(ActiveSourcePath, out var activeMode))
+            return activeMode;
+        if (SimulationModeEnabled && SelectedSimulationMode != SimulationModeType.None)
+            return SelectedSimulationMode;
+        return SimulationModeType.None;
+    }
+
+    public static string GetSimulationSourceKey(SimulationModeType mode) => $"SIM:{mode}";
+
+    public static bool TryParseSimulationSource(string? sourcePath, out SimulationModeType mode)
+    {
+        mode = SimulationModeType.None;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !sourcePath.StartsWith("SIM:", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var raw = sourcePath.Substring(4).Trim();
+        return Enum.TryParse(raw, true, out mode) && mode != SimulationModeType.None;
+    }
+
+    public static string GetSimulationDisplayName(SimulationModeType mode) => mode switch
+    {
+        SimulationModeType.CyberOpsTerminal => "CyberOps SOC Terminal (Hacker Simulator)",
+        SimulationModeType.Windows11Update => "Windows 11 System Update",
+        SimulationModeType.Windows10Update => "Windows 10 System Update",
+        SimulationModeType.MacOSUpdate => "macOS Firmware Update",
+        SimulationModeType.UbuntuUpdate => "Ubuntu Linux Boot / Update",
+        SimulationModeType.ChromeOSUpdate => "ChromeOS System Update",
+        SimulationModeType.RandomOSUpdate => "Random OS Update (Shuffle)",
+        _ => "Simulation Mode"
+    };
 
     public int MouseSensitivityPixels { get; set; } = 25;
     public bool AllowDisplaySleep { get; set; } = true;
