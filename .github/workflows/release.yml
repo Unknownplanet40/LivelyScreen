@@ -44,10 +44,7 @@ jobs:
         run: |
           $tagVersion = "${{ github.ref_name }}".TrimStart('v')
           $changelog = Get-Content -Raw "CHANGELOG.md" -ErrorAction SilentlyContinue
-          $pattern = "(?s)## \[" + [regex]::Escape($tagVersion) + "\][^
-]*?
-(.*?)(?=?
-## \[|\z)"
+          $pattern = "(?s)## \[" + [regex]::Escape($tagVersion) + "\][^\r\n]*?\r?\n(.*?)(?=\r?\n## \[|\z)"
           if ($changelog -and ($changelog -match $pattern)) {
               $notes = $matches[1].Trim()
               Set-Content -Path "RELEASE_NOTES.md" -Value $notes -Encoding utf8
