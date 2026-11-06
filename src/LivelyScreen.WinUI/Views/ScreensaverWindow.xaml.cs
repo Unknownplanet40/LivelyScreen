@@ -59,6 +59,11 @@ public sealed partial class ScreensaverWindow : Window
     public event Action? DismissRequested;
     public event Action? DisplayConfigurationChanged;
     public event Action<MediaItem, bool>? MediaBroadcastRequested;
+    public event Action<MediaItem>? MediaPreloadRequested;
+
+    private MediaItem? _preloadedNextItem;
+    private BitmapImage? _preloadedNextBitmap;
+    private CancellationTokenSource? _preloadCts;
 
     public ScreensaverWindow(
         SettingsService settingsService,
@@ -82,9 +87,28 @@ public sealed partial class ScreensaverWindow : Window
         DisplayIndex = displayIndex;
         AssignedSourcePath = assignedSourcePath;
 
+        ImageA.ImageFailed += (_, args) =>
+        {
+            App.Log($"[ImageA] ImageFailed: {args.ErrorMessage}");
+            if (!_isClosing && !_isBlackout && (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone || _settingsService.Current.TargetDisplayIndex >= 0))
+            {
+                DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
+            }
+        };
+
+        ImageB.ImageFailed += (_, args) =>
+        {
+            App.Log($"[ImageB] ImageFailed: {args.ErrorMessage}");
+            if (!_isClosing && !_isBlackout && (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone || _settingsService.Current.TargetDisplayIndex >= 0))
+            {
+                DispatcherQueue.TryEnqueue(() => AdvanceToNextMedia());
+            }
+        };
+
         _photoTimer = new DispatcherTimer();
         _photoTimer.Tick += (_, _) =>
         {
+            App.Log($"[PhotoTimer] Tick on {(_bounds.X == 0 && _bounds.Y == 0 ? "primary" : "secondary")} (isClosing={_isClosing}, isBlackout={_isBlackout})");
             if (_isClosing || _isBlackout)
             {
                 _photoTimer.Stop();
@@ -602,10 +626,11 @@ public sealed partial class ScreensaverWindow : Window
         {
             if (item.Type == MediaType.Image)
             {
-                if (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone)
+                if (IsMaster || _settingsService.Current.DisplayMode != MonitorMode.Clone || _settingsService.Current.TargetDisplayIndex >= 0)
                 {
                     _photoTimer.Interval = TimeSpan.FromSeconds(Math.Max(2, profile.PhotoDisplaySeconds));
                     _photoTimer.Start();
+                    App.Log($"[PhotoTimer] Reset for single image with {profile.PhotoDisplaySeconds}s");
                 }
                 return;
             }
@@ -673,14 +698,27 @@ public sealed partial class ScreensaverWindow : Window
 
     public void AdvanceToNextMedia(bool initial = false)
     {
+        App.Log($"[AdvanceToNextMedia] called: initial={initial}, isMaster={IsMaster}, isBlackout={_isBlackout}");
         if (_isClosing || _isBlackout) return;
 
-        if (!IsMaster && _settingsService.Current.DisplayMode == MonitorMode.Clone)
+        if (!IsMaster && _settingsService.Current.DisplayMode == MonitorMode.Clone && _settingsService.Current.TargetDisplayIndex < 0)
         {
+            App.Log("[AdvanceToNextMedia] skipped because not master in Clone mode");
             return;
         }
 
-        var item = _mediaLibrary.GetNextItem(_settingsService.Current.Order, AssignedSourcePath);
+        MediaItem? item;
+        if (!initial && _preloadedNextItem != null)
+        {
+            item = _preloadedNextItem;
+            _preloadedNextItem = null;
+            App.Log($"[AdvanceToNextMedia] Using preloaded item: {item.FileName}");
+        }
+        else
+        {
+            item = _mediaLibrary.GetNextItem(_settingsService.Current.Order, AssignedSourcePath);
+            App.Log($"[AdvanceToNextMedia] GetNextItem returned: {item?.FileName ?? "NULL"} (source: {AssignedSourcePath})");
+        }
         if (_isClosing || _isBlackout) return;
 
         if (item == null)
@@ -697,7 +735,7 @@ public sealed partial class ScreensaverWindow : Window
         }
     }
 
-    private async void LoadMediaIntoLayer(
+    private void LoadMediaIntoLayer(
         Microsoft.UI.Xaml.Controls.Grid layer,
         Microsoft.UI.Xaml.Controls.Image imgCtrl,
         Microsoft.UI.Xaml.Controls.MediaPlayerElement vidCtrl,
@@ -808,6 +846,7 @@ public sealed partial class ScreensaverWindow : Window
                                 _videoWatchdogTimer.Interval = TimeSpan.FromMinutes(10);
                             }
                             _videoWatchdogTimer.Start();
+                            TriggerUpcomingMediaPreload();
                         });
                     };
                 }
@@ -837,30 +876,37 @@ public sealed partial class ScreensaverWindow : Window
                 if (!File.Exists(item.FilePath))
                 {
                     App.Log($"Image file not found: {item.FilePath}");
-                    if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
+                    if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone || settings.TargetDisplayIndex >= 0))
                     {
                         AdvanceToNextMedia();
                     }
                     return;
                 }
 
-                using var fs = new FileStream(item.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-                var ras = fs.AsRandomAccessStream();
-
-                int targetDecodeWidth = Math.Clamp(_bounds.Width > 0 ? _bounds.Width : 1920, 640, 2560);
-                var bitmap = new BitmapImage
+                BitmapImage bitmap;
+                if (_preloadedNextBitmap != null &&
+                    string.Equals(_preloadedNextItem?.FilePath, item.FilePath, StringComparison.OrdinalIgnoreCase))
                 {
-                    DecodePixelWidth = targetDecodeWidth,
-                    DecodePixelType = DecodePixelType.Physical
-                };
-                await bitmap.SetSourceAsync(ras);
-                if (_isClosing || _isBlackout) return;
+                    bitmap = _preloadedNextBitmap;
+                    _preloadedNextBitmap = null;
+                    App.Log($"[LoadMedia] Instant switch using pre-decoded bitmap for {item.FileName}");
+                }
+                else
+                {
+                    int targetDecodeWidth = Math.Clamp(_bounds.Width > 0 ? _bounds.Width : 1920, 640, 2560);
+                    bitmap = new BitmapImage
+                    {
+                        UriSource = new Uri(item.FilePath),
+                        DecodePixelWidth = targetDecodeWidth,
+                        DecodePixelType = DecodePixelType.Physical
+                    };
+                }
                 imgCtrl.Source = bitmap;
             }
             catch (Exception ex)
             {
                 App.Log($"Error loading image {item.FileName}: {ex.Message}");
-                if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone))
+                if (!_isClosing && !_isBlackout && (IsMaster || settings.DisplayMode != MonitorMode.Clone || settings.TargetDisplayIndex >= 0))
                 {
                     AdvanceToNextMedia();
                     return;
@@ -919,11 +965,120 @@ public sealed partial class ScreensaverWindow : Window
 
             if (_isClosing || _isBlackout) return;
 
-            if (IsMaster || settings.DisplayMode != MonitorMode.Clone)
+            if (IsMaster || settings.DisplayMode != MonitorMode.Clone || settings.TargetDisplayIndex >= 0)
             {
                 _photoTimer.Interval = TimeSpan.FromSeconds(Math.Max(2.0, profile.PhotoDisplaySeconds));
                 _photoTimer.Start();
+                App.Log($"[PhotoTimer] Started with {profile.PhotoDisplaySeconds}s for {item.FileName} on {(_bounds.X == 0 && _bounds.Y == 0 ? "primary" : "secondary")}");
             }
+
+            TriggerUpcomingMediaPreload();
+        }
+    }
+
+    public void PreloadMedia(MediaItem nextItem)
+    {
+        if (_isClosing || _isBlackout) return;
+
+        _preloadCts?.Cancel();
+        _preloadCts?.Dispose();
+        _preloadCts = new CancellationTokenSource();
+        var token = _preloadCts.Token;
+
+        _preloadedNextItem = nextItem;
+        _preloadedNextBitmap = null;
+
+        if (nextItem.Type == MediaType.Image && File.Exists(nextItem.FilePath))
+        {
+            int targetDecodeWidth = Math.Clamp(_bounds.Width > 0 ? _bounds.Width : 1920, 640, 2560);
+            try
+            {
+                _preloadedNextBitmap = new BitmapImage
+                {
+                    UriSource = new Uri(nextItem.FilePath),
+                    DecodePixelWidth = targetDecodeWidth,
+                    DecodePixelType = DecodePixelType.Physical
+                };
+            }
+            catch (Exception ex)
+            {
+                App.Log($"[Preload] Bitmap pre-decode failed for {nextItem.FileName}: {ex.Message}");
+            }
+
+            string path = nextItem.FilePath;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await WarmFileToOsCacheAsync(path, maxBytes: 32 * 1024 * 1024, token).ConfigureAwait(false);
+                    App.Log($"[Preload] Warmed {Path.GetFileName(path)} into OS cache");
+                }
+                catch { }
+            }, token);
+        }
+        else if (nextItem.Type == MediaType.Video && File.Exists(nextItem.FilePath))
+        {
+            string path = nextItem.FilePath;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await WarmFileToOsCacheAsync(path, maxBytes: 16 * 1024 * 1024, token).ConfigureAwait(false);
+                    App.Log($"[Preload] Warmed video header {Path.GetFileName(path)} into OS cache");
+                }
+                catch { }
+            }, token);
+        }
+    }
+
+    private void TriggerUpcomingMediaPreload()
+    {
+        if (_isClosing || _isBlackout) return;
+
+        if (!IsMaster && _settingsService.Current.DisplayMode == MonitorMode.Clone && _settingsService.Current.TargetDisplayIndex < 0)
+        {
+            return;
+        }
+
+        var nextItem = _mediaLibrary.GetNextItem(_settingsService.Current.Order, AssignedSourcePath);
+        if (nextItem == null) return;
+
+        PreloadMedia(nextItem);
+
+        if (IsMaster && _settingsService.Current.DisplayMode == MonitorMode.Clone)
+        {
+            MediaPreloadRequested?.Invoke(nextItem);
+        }
+    }
+
+    private static async Task WarmFileToOsCacheAsync(string filePath, int maxBytes, CancellationToken ct)
+    {
+        if (!File.Exists(filePath) || ct.IsCancellationRequested) return;
+
+        const int bufferSize = 64 * 1024;
+        byte[] buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(bufferSize);
+        try
+        {
+            await using var fs = new FileStream(
+                filePath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite,
+                bufferSize,
+                FileOptions.SequentialScan | FileOptions.Asynchronous);
+
+            int totalRead = 0;
+            int read;
+            while (totalRead < maxBytes &&
+                   (read = await fs.ReadAsync(buffer.AsMemory(0, bufferSize), ct).ConfigureAwait(false)) > 0)
+            {
+                totalRead += read;
+                if (ct.IsCancellationRequested) break;
+            }
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 
@@ -1250,6 +1405,13 @@ public sealed partial class ScreensaverWindow : Window
         DismissRequested = null;
         DisplayConfigurationChanged = null;
         MediaBroadcastRequested = null;
+        MediaPreloadRequested = null;
+
+        _preloadCts?.Cancel();
+        _preloadCts?.Dispose();
+        _preloadCts = null;
+        _preloadedNextBitmap = null;
+        _preloadedNextItem = null;
 
         _photoTimer.Stop();
         _videoWatchdogTimer.Stop();
@@ -1296,6 +1458,13 @@ public sealed partial class ScreensaverWindow : Window
         DismissRequested = null;
         DisplayConfigurationChanged = null;
         MediaBroadcastRequested = null;
+        MediaPreloadRequested = null;
+
+        _preloadCts?.Cancel();
+        _preloadCts?.Dispose();
+        _preloadCts = null;
+        _preloadedNextBitmap = null;
+        _preloadedNextItem = null;
 
         if (IsMaster)
         {

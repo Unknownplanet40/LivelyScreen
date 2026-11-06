@@ -267,6 +267,16 @@ public class ScreensaverManager
                                         }
                                     }
                                 };
+                                win.MediaPreloadRequested += (nextItem) =>
+                                {
+                                    foreach (var other in _activeWindows)
+                                    {
+                                        if (other != win && !other.IsBlackout)
+                                        {
+                                            other.PreloadMedia(nextItem);
+                                        }
+                                    }
+                                };
                             }
                         }
 

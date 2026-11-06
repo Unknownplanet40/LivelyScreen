@@ -148,4 +148,67 @@ public static class DashboardFormatters
 
         return addressOrEndpoint;
     }
+
+    public static string MaskPath(string path, bool maskSensitive)
+    {
+        if (!maskSensitive || string.IsNullOrWhiteSpace(path))
+            return path;
+
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(userProfile) && path.StartsWith(userProfile, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Concat(@"C:\Users\****", path.AsSpan(userProfile.Length));
+        }
+
+        string userName = Environment.UserName;
+        if (!string.IsNullOrEmpty(userName) && path.Contains(userName, StringComparison.OrdinalIgnoreCase))
+        {
+            return path.Replace(userName, "****", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return path;
+    }
+
+    public static string FormatHexLineBytes(ReadOnlySpan<byte> bytes)
+    {
+        Span<char> chars = stackalloc char[49];
+        int charIdx = 0;
+        for (int i = 0; i < 16; i++)
+        {
+            if (i < bytes.Length)
+            {
+                byte b = bytes[i];
+                chars[charIdx++] = GetHexNibble(b >> 4);
+                chars[charIdx++] = GetHexNibble(b & 0xF);
+            }
+            else
+            {
+                chars[charIdx++] = ' ';
+                chars[charIdx++] = ' ';
+            }
+
+            if (i < 15)
+            {
+                chars[charIdx++] = ' ';
+                if (i == 7)
+                {
+                    chars[charIdx++] = ' ';
+                }
+            }
+        }
+        return new string(chars);
+
+        static char GetHexNibble(int val) => val < 10 ? (char)('0' + val) : (char)('A' + (val - 10));
+    }
+
+    public static string FormatAsciiGutter(ReadOnlySpan<byte> bytes)
+    {
+        Span<char> chars = stackalloc char[bytes.Length];
+        for (int i = 0; i < bytes.Length; i++)
+        {
+            byte b = bytes[i];
+            chars[i] = (b >= 32 && b <= 126) ? (char)b : '.';
+        }
+        return new string(chars);
+    }
 }

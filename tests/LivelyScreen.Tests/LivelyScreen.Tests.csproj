@@ -22,5 +22,6 @@
     <Compile Include="..\..\src\LivelyScreen.WinUI\Services\Dashboard\RingBuffer.cs" Link="Dashboard\RingBuffer.cs" />
     <Compile Include="..\..\src\LivelyScreen.WinUI\Services\Dashboard\DashboardFormatters.cs" Link="Dashboard\DashboardFormatters.cs" />
     <Compile Include="..\..\src\LivelyScreen.WinUI\Services\Dashboard\DashboardEventDiffBuilder.cs" Link="Dashboard\DashboardEventDiffBuilder.cs" />
+    <Compile Include="..\..\src\LivelyScreen.WinUI\Services\Dashboard\FileReconSampler.cs" Link="Dashboard\FileReconSampler.cs" />
   </ItemGroup>
 </Project>

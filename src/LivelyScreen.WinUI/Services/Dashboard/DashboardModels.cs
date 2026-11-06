@@ -158,6 +158,38 @@ public enum DashboardEventSeverity
     Dim
 }
 
+public enum ReconDisplayMode
+{
+    TreeF = 0,
+    HexDump = 1
+}
+
+public readonly record struct TreeReconLine
+{
+    public required string Branch { get; init; }
+    public required string Name { get; init; }
+    public required string? Tag { get; init; }
+    public required DashboardEventSeverity Severity { get; init; }
+    public required bool IsDirectory { get; init; }
+}
+
+public readonly record struct HexDumpLine
+{
+    public required uint Offset { get; init; }
+    public required string HexBytes { get; init; }
+    public required string AsciiGutter { get; init; }
+    public required string SourceName { get; init; }
+}
+
+public sealed record ReconSnapshot
+{
+    public required ReconDisplayMode Mode { get; init; }
+    public required double SecondsRemainingInMode { get; init; }
+    public required string CurrentTarget { get; init; }
+    public required IReadOnlyList<TreeReconLine> TreeLines { get; init; }
+    public required IReadOnlyList<HexDumpLine> HexLines { get; init; }
+}
+
 public readonly record struct DashboardEventEntry
 {
     public required DateTime Timestamp { get; init; }

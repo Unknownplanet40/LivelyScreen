@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-11-06
+
+### Added
+- **CyberOps SOC Live Disk Recon & Binary Hex Dump**: Added `tree /f` directory hierarchy crawler and 16-byte binary inspection panel with ASCII gutters, rotating every 12 seconds alongside live event logs.
+- **Artwork Pre-Warming & Decode Pipeline**: Implemented background sequential I/O OS-cache warming and GPU Direct3D texture pre-decoding for smooth 60/120 FPS photo transitions on mechanical HDDs.
+- **Multi-Monitor Preload Broadcast**: Master window now synchronizes preloaded media across cloned monitors simultaneously.
+
+### Fixed
+- **Artwork Gallery Timer Freeze**: Fixed photo advance timer stalling due to async stream decode lockups in WinRT pipeline.
+- **Corrupt Image Resilience**: Hooked `ImageFailed` to automatically advance past corrupted or unreadable images instead of locking the screensaver.
+- **Dashboard Sampler Lifecycle**: Added explicit `Attach()` and `Detach()` handlers to avoid event handler accumulation on screensaver start/stop cycles.
+
 ## [1.0.9] - 2026-11-06
 
 ### Added

@@ -18,6 +18,7 @@ public sealed class HackerDashboardViewModel
     public RingBuffer<DashboardEventEntry> EventLog { get; } = new(MaxEventLogCapacity);
 
     public DashboardSnapshot? LatestSnapshot { get; private set; }
+    public ReconSnapshot? LatestRecon { get; private set; }
     public bool MaskSensitive { get; set; }
 
     private float[] _displayedCorePercents = [];
@@ -34,6 +35,35 @@ public sealed class HackerDashboardViewModel
     public HackerDashboardViewModel(DispatcherQueue? dispatcherQueue = null)
     {
         _dispatcherQueue = dispatcherQueue;
+        Attach();
+    }
+
+    public void Attach()
+    {
+        FileReconSampler.Shared.ReconUpdated -= OnReconUpdated;
+        FileReconSampler.Shared.ReconUpdated += OnReconUpdated;
+    }
+
+    public void Detach()
+    {
+        FileReconSampler.Shared.ReconUpdated -= OnReconUpdated;
+    }
+
+    private void OnReconUpdated()
+    {
+        if (_dispatcherQueue != null && !_dispatcherQueue.HasThreadAccess)
+        {
+            _dispatcherQueue.TryEnqueue(() =>
+            {
+                LatestRecon = FileReconSampler.Shared.GetSnapshot(MaskSensitive);
+                StateUpdated?.Invoke();
+            });
+        }
+        else
+        {
+            LatestRecon = FileReconSampler.Shared.GetSnapshot(MaskSensitive);
+            StateUpdated?.Invoke();
+        }
     }
 
     public void OnSnapshotReceived(DashboardSnapshot snapshot)
@@ -111,6 +141,9 @@ public sealed class HackerDashboardViewModel
     {
         if (dtSeconds <= 0.0 || double.IsNaN(dtSeconds) || double.IsInfinity(dtSeconds))
             return false;
+
+        FileReconSampler.Shared.AdvanceTime(dtSeconds);
+        LatestRecon = FileReconSampler.Shared.GetSnapshot(MaskSensitive);
 
         // Exponential decay factor reaching ~95% in 300 ms
         float alpha = (float)Math.Clamp(1.0 - Math.Exp(-dtSeconds / 0.10), 0.0, 1.0);

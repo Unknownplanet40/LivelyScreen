@@ -102,6 +102,8 @@ public sealed class HackerDashboardCanvasControl : UserControl
         DashboardSampler.Shared.SnapshotPublished -= _viewModel.OnSnapshotReceived;
         DashboardSampler.Shared.SnapshotPublished += _viewModel.OnSnapshotReceived;
         DashboardSampler.Shared.AddRef();
+        FileReconSampler.Shared.AddRef();
+        _viewModel.Attach();
 
         var existing = DashboardSampler.Shared.LatestSnapshot;
         if (existing != null)
@@ -122,6 +124,8 @@ public sealed class HackerDashboardCanvasControl : UserControl
         CompositionTarget.Rendering -= OnCompositionRendering;
         DashboardSampler.Shared.SnapshotPublished -= _viewModel.OnSnapshotReceived;
         DashboardSampler.Shared.ReleaseRef();
+        FileReconSampler.Shared.ReleaseRef();
+        _viewModel.Detach();
         InvalidateTextLayouts();
     }
 
@@ -277,10 +281,10 @@ public sealed class HackerDashboardCanvasControl : UserControl
         ds.DrawLine(padX, headerDividerY, w - padX, headerDividerY, ColorRule, 1f);
 
         // ====================================================================
-        // 2. THREE-COLUMN MAIN AREA + BOTTOM EVENT LOG
+        // 2. THREE-COLUMN MAIN AREA + BOTTOM SPLIT RECON PANE
         // ====================================================================
         float mainTopY = headerDividerY + h * 0.018f;
-        float eventSectionTopY = h * 0.785f;
+        float eventSectionTopY = h * 0.72f;
         float mainBottomY = eventSectionTopY - h * 0.015f;
 
         float colGap = contentW * 0.025f;
@@ -297,11 +301,23 @@ public sealed class HackerDashboardCanvasControl : UserControl
         DrawColumn3ProcessesAndConnections(ds, snap, mask, col3X, mainTopY, col3W, mainBottomY, fontH, lineStep);
 
         // ====================================================================
-        // 3. BOTTOM FULL-WIDTH EVENT LOG
+        // 3. BOTTOM SPLIT: EVENT LOG (LEFT) + CYBER RECON INSPECTOR (RIGHT)
         // ====================================================================
         ds.DrawLine(padX, eventSectionTopY, w - padX, eventSectionTopY, ColorRule, 1f);
+
+        float bottomSplitGap = contentW * 0.025f;
+        float bottomColLeftW = (contentW - bottomSplitGap) * 0.49f;
+        float bottomColRightW = contentW - bottomColLeftW - bottomSplitGap;
+        float bottomColRightX = padX + bottomColLeftW + bottomSplitGap;
+
+        // Vertical divider separating Event Log and Cyber Recon
+        float vertDividerX = padX + bottomColLeftW + (bottomSplitGap * 0.5f);
+        ds.DrawLine(vertDividerX, eventSectionTopY, vertDividerX, h - padY, ColorRule, 1f);
+
         float evHeaderY = eventSectionTopY + h * 0.012f;
-        DrawSectionHeader(ds, 900, "EVENT LOG", 901, "live from system", padX, evHeaderY, contentW, fontH);
+
+        // --- LEFT: EVENT LOG ---
+        DrawSectionHeader(ds, 900, "EVENT LOG", 901, "live from system", padX, evHeaderY, bottomColLeftW, fontH);
 
         float evRowY = evHeaderY + fontH * 2.0f;
         float evRowStep = fontH * 1.48f;
@@ -309,7 +325,6 @@ public sealed class HackerDashboardCanvasControl : UserControl
         int maxVisibleEvents = Math.Max(1, (int)((h - padY - evRowY) / evRowStep));
         int shown = 0;
 
-        // Render newest first matching mockup (14:32:09, 14:32:07, 14:32:04...)
         for (int i = evCount - 1; i >= 0 && shown < maxVisibleEvents; i--, shown++)
         {
             var ev = _viewModel.EventLog[i];
@@ -327,10 +342,105 @@ public sealed class HackerDashboardCanvasControl : UserControl
             };
 
             DrawTextLeft(ds, baseSlot, timeTxt, padX, evRowY, ColorLabel);
-            DrawTextLeft(ds, baseSlot + 1, catTxt, padX + fontH * 6.2f, evRowY, ColorAccent, bold: true);
-            DrawTextLeft(ds, baseSlot + 2, msgTxt, padX + fontH * 10.6f, evRowY, msgColor);
+            DrawTextLeft(ds, baseSlot + 1, catTxt, padX + fontH * 5.6f, evRowY, ColorAccent, bold: true);
+            DrawTextLeft(ds, baseSlot + 2, ShortenText(msgTxt, 42), padX + fontH * 9.6f, evRowY, msgColor);
 
             evRowY += evRowStep;
+        }
+
+        // --- RIGHT: CYBER RECON (TREE /F or HEX DUMP) ---
+        DrawCyberReconSection(ds, _viewModel.LatestRecon, bottomColRightX, evHeaderY, bottomColRightW, h - padY, fontH, evRowStep);
+    }
+
+    private void DrawCyberReconSection(
+        CanvasDrawingSession ds,
+        ReconSnapshot? recon,
+        float x,
+        float headerY,
+        float width,
+        float bottomLimitY,
+        float fontH,
+        float rowStep)
+    {
+        if (recon == null)
+        {
+            DrawSectionHeader(ds, 950, "FILE RECON // TREE /F", 951, "[INITIALIZING...]", x, headerY, width, fontH);
+            return;
+        }
+
+        bool isTree = recon.Mode == ReconDisplayMode.TreeF;
+        string headerTitle = isTree ? "FILE RECON // TREE /F" : "BINARY INSPECT // HEX DUMP";
+        string headerStatus = string.Format(CultureInfo.InvariantCulture, "[{0:F0}s] {1}", recon.SecondsRemainingInMode, ShortenText(recon.CurrentTarget, 28));
+
+        DrawSectionHeader(ds, 950, headerTitle, 951, headerStatus, x, headerY, width, fontH);
+
+        float rowY = headerY + fontH * 2.0f;
+        int maxRows = Math.Max(1, (int)((bottomLimitY - rowY) / rowStep));
+
+        if (isTree)
+        {
+            int treeCount = recon.TreeLines.Count;
+            int startIndex = Math.Max(0, treeCount - maxRows);
+            int slotIdx = 0;
+
+            for (int i = startIndex; i < treeCount && slotIdx < maxRows; i++, slotIdx++)
+            {
+                var line = recon.TreeLines[i];
+                int baseSlot = 1000 + slotIdx * 4;
+
+                DrawTextLeft(ds, baseSlot, line.Branch, x, rowY, ColorLabel);
+
+                float branchWidth = fontH * 0.60f * line.Branch.Length;
+                float nameX = x + branchWidth;
+
+                float tagReserved = string.IsNullOrEmpty(line.Tag) ? 0f : (line.Tag.Length + 2) * fontH * 0.60f;
+                float nameAvailW = Math.Max(fontH * 6f, width - branchWidth - tagReserved);
+                int maxChars = Math.Max(10, (int)(nameAvailW / (fontH * 0.60f)));
+
+                Color nameColor = line.IsDirectory ? ColorAccent : ColorText;
+                DrawTextLeft(ds, baseSlot + 1, ShortenText(line.Name, maxChars), nameX, rowY, nameColor, bold: line.IsDirectory);
+
+                if (!string.IsNullOrEmpty(line.Tag))
+                {
+                    Color tagColor = line.Severity switch
+                    {
+                        DashboardEventSeverity.Critical => ColorCritical,
+                        DashboardEventSeverity.Warning => ColorWarning,
+                        DashboardEventSeverity.Dim => ColorLabel,
+                        _ => ColorAccent
+                    };
+                    DrawTextRight(ds, baseSlot + 2, line.Tag, x + width, rowY, tagColor);
+                }
+
+                rowY += rowStep;
+            }
+        }
+        else
+        {
+            int hexCount = recon.HexLines.Count;
+            int startIndex = Math.Max(0, hexCount - maxRows);
+            int slotIdx = 0;
+
+            for (int i = startIndex; i < hexCount && slotIdx < maxRows; i++, slotIdx++)
+            {
+                var line = recon.HexLines[i];
+                int baseSlot = 1100 + slotIdx * 4;
+
+                string offsetStr = string.Format(CultureInfo.InvariantCulture, "{0:X8}", line.Offset);
+                DrawTextLeft(ds, baseSlot, offsetStr, x, rowY, ColorLabel);
+
+                float hexX = x + fontH * 5.8f;
+                DrawTextLeft(ds, baseSlot + 1, line.HexBytes, hexX, rowY, ColorText);
+
+                float asciiX = hexX + fontH * 29.5f;
+                if (asciiX + fontH * 11f <= x + width)
+                {
+                    string gutter = $"|{line.AsciiGutter}|";
+                    DrawTextLeft(ds, baseSlot + 2, gutter, asciiX, rowY, ColorAccent);
+                }
+
+                rowY += rowStep;
+            }
         }
     }
 

@@ -386,4 +386,53 @@ public sealed class DashboardTests
             };
         }
     }
+
+    [Fact]
+    public void MaskPath_MasksUserProfileAndUserName()
+    {
+        string userPath = @"C:\Users\tester\Documents\secret.txt";
+        Assert.Equal(userPath, DashboardFormatters.MaskPath(userPath, maskSensitive: false));
+
+        string currentUsername = Environment.UserName;
+        string pathWithUser = $@"C:\Users\{currentUsername}\AppData\Local\Temp";
+        string masked = DashboardFormatters.MaskPath(pathWithUser, maskSensitive: true);
+        Assert.DoesNotContain(currentUsername, masked, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("****", masked);
+    }
+
+    [Fact]
+    public void FormatHexLineBytes_Formats16BytesWithMiddleSpace()
+    {
+        byte[] bytes = [0x4D, 0x5A, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00];
+        string hex = DashboardFormatters.FormatHexLineBytes(bytes);
+
+        // 49 chars length: 16 pairs + 15 spaces + 1 middle extra space = 48 + 1 = 49
+        Assert.Equal(49, hex.Length);
+        Assert.StartsWith("4D 5A 90 00 03 00 00 00  04 00 00 00 FF FF 00 00", hex);
+
+        string ascii = DashboardFormatters.FormatAsciiGutter(bytes);
+        Assert.Equal(16, ascii.Length);
+        Assert.StartsWith("MZ", ascii);
+        Assert.Equal('.', ascii[2]); // 0x90 non-printable -> '.'
+    }
+
+    [Fact]
+    public void FileReconSampler_CyclesModeAndMaintainsBuffer()
+    {
+        var sampler = FileReconSampler.Shared;
+        var snapInitial = sampler.GetSnapshot(maskSensitive: false);
+        Assert.NotNull(snapInitial);
+
+        var initialMode = snapInitial.Mode;
+
+        // Advance past 12.0s
+        sampler.AdvanceTime(13.0);
+        var snapAfter = sampler.GetSnapshot(maskSensitive: false);
+        Assert.NotEqual(initialMode, snapAfter.Mode);
+
+        // Advance again -> toggles back
+        sampler.AdvanceTime(13.0);
+        var snapBack = sampler.GetSnapshot(maskSensitive: false);
+        Assert.Equal(initialMode, snapBack.Mode);
+    }
 }
