@@ -179,6 +179,7 @@ public sealed partial class ScreensaverWindow : Window
             _blackoutStageTimer.Stop();
             _taskbarWatchdogTimer.Stop();
             SimulationOverlayControl?.StopSimulation();
+            StopKnowledgeMapWeb();
             _kenBurnsStoryboardA?.Stop();
             _kenBurnsStoryboardB?.Stop();
             _currentTransition?.Stop();
@@ -313,7 +314,10 @@ public sealed partial class ScreensaverWindow : Window
 
     private void ApplyActiveMonitorPresentation(bool initialMedia)
     {
-        var simMode = _settingsService.Current.GetEffectiveSimulationMode(AssignedSourcePath);
+        var s = _settingsService.Current;
+        var simMode = s.GetEffectiveSimulationMode(AssignedSourcePath);
+        bool isKnowledgeMap = s.IsKnowledgeMapActive(AssignedSourcePath);
+
         if (_isBlackout)
         {
             _photoTimer.Stop();
@@ -331,6 +335,7 @@ public sealed partial class ScreensaverWindow : Window
             if (BorderBatteryBadge != null) BorderBatteryBadge.Visibility = Visibility.Collapsed;
             if (BorderMediaInfo != null) BorderMediaInfo.Visibility = Visibility.Collapsed;
             if (BorderArtworkPlaque != null) BorderArtworkPlaque.Visibility = Visibility.Collapsed;
+            StopKnowledgeMapWeb();
             if (SimulationOverlayControl != null)
             {
                 SimulationOverlayControl.StopSimulation();
@@ -349,6 +354,7 @@ public sealed partial class ScreensaverWindow : Window
             NoMediaPrompt.Visibility = Visibility.Collapsed;
             LayerA.Visibility = Visibility.Collapsed;
             LayerB.Visibility = Visibility.Collapsed;
+            StopKnowledgeMapWeb();
             if (OledShiftContainer != null) OledShiftContainer.Visibility = Visibility.Collapsed;
             if (OverlayWidgetsLayer != null) OverlayWidgetsLayer.Visibility = Visibility.Collapsed;
             if (OverlayQuoteWidget != null) OverlayQuoteWidget.Visibility = Visibility.Collapsed;
@@ -360,11 +366,52 @@ public sealed partial class ScreensaverWindow : Window
                 SimulationOverlayControl.RequestDismiss -= TriggerDismiss;
                 SimulationOverlayControl.RequestDismiss += TriggerDismiss;
                 SimulationOverlayControl.Visibility = Visibility.Visible;
-                SimulationOverlayControl.StartSimulation(simMode, _settingsService.Current, joinExistingSession: true);
+                SimulationOverlayControl.StartSimulation(simMode, s, joinExistingSession: true);
+            }
+        }
+        else if (isKnowledgeMap)
+        {
+            _photoTimer.Stop();
+            _videoWatchdogTimer.Stop();
+            _blackoutStageTimer.Stop();
+
+            NoMediaPrompt.Visibility = Visibility.Collapsed;
+            LayerA.Visibility = Visibility.Collapsed;
+            LayerB.Visibility = Visibility.Collapsed;
+            if (BorderMediaInfo != null) BorderMediaInfo.Visibility = Visibility.Collapsed;
+            if (BorderArtworkPlaque != null) BorderArtworkPlaque.Visibility = Visibility.Collapsed;
+            if (SimulationOverlayControl != null)
+            {
+                SimulationOverlayControl.StopSimulation();
+                SimulationOverlayControl.Visibility = Visibility.Collapsed;
+            }
+
+            StartKnowledgeMapWeb(s);
+
+            if (s.KnowledgeMapSuppressWidgets)
+            {
+                _clockTimer.Stop();
+                _clockShuffleTimer.Stop();
+                if (OledShiftContainer != null) OledShiftContainer.Visibility = Visibility.Collapsed;
+                if (OverlayWidgetsLayer != null) OverlayWidgetsLayer.Visibility = Visibility.Collapsed;
+                if (OverlayQuoteWidget != null) OverlayQuoteWidget.Visibility = Visibility.Collapsed;
+                if (BorderBatteryBadge != null) BorderBatteryBadge.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                if (OledShiftContainer != null) OledShiftContainer.Visibility = Visibility.Visible;
+                UpdateClockWidget();
+                if (CanDisplayWidgets())
+                {
+                    _clockTimer.Start();
+                    StartClockShuffleTimer();
+                    StartOledShiftTimer();
+                }
             }
         }
         else
         {
+            StopKnowledgeMapWeb();
             if (SimulationOverlayControl != null)
             {
                 SimulationOverlayControl.StopSimulation();
@@ -1213,6 +1260,7 @@ public sealed partial class ScreensaverWindow : Window
         _taskbarWatchdogTimer.Stop();
 
         SimulationOverlayControl?.StopSimulation();
+        StopKnowledgeMapWeb();
         _kenBurnsStoryboardA?.Stop();
         _kenBurnsStoryboardB?.Stop();
         _currentTransition?.Stop();
@@ -1263,6 +1311,7 @@ public sealed partial class ScreensaverWindow : Window
         _taskbarWatchdogTimer.Stop();
 
         SimulationOverlayControl?.StopSimulation();
+        StopKnowledgeMapWeb();
         _kenBurnsStoryboardA?.Stop();
         _kenBurnsStoryboardB?.Stop();
         _currentTransition?.Stop();
@@ -1331,6 +1380,11 @@ public sealed partial class ScreensaverWindow : Window
     {
         var s = _settingsService.Current;
         if (s.IsSimulationActive || s.GetEffectiveSimulationMode(AssignedSourcePath) != SimulationModeType.None)
+        {
+            return false;
+        }
+
+        if (s.IsKnowledgeMapActive(AssignedSourcePath) && s.KnowledgeMapSuppressWidgets)
         {
             return false;
         }
@@ -1546,6 +1600,8 @@ public sealed partial class ScreensaverWindow : Window
                     : new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 238, 238, 238));
             }
         }
+
+        UpdateOverlayPillPositions();
     }
 
     private void PlaceCardInZone(FrameworkElement card, WidgetPosition pos)
@@ -1665,6 +1721,7 @@ public sealed partial class ScreensaverWindow : Window
             return;
         }
 
+        UpdateOverlayPillPositions();
         BorderMediaInfo.Opacity = 0;
         BorderMediaInfo.Visibility = Visibility.Visible;
 
@@ -1739,6 +1796,7 @@ public sealed partial class ScreensaverWindow : Window
             BorderMediaInfo.Opacity = 0;
         }
 
+        UpdateOverlayPillPositions();
         BorderArtworkPlaque.Opacity = 0;
         BorderArtworkPlaque.Visibility = Visibility.Visible;
 
@@ -1754,6 +1812,141 @@ public sealed partial class ScreensaverWindow : Window
         Storyboard.SetTargetProperty(anim, "Opacity");
         sb.Children.Add(anim);
         sb.Begin();
+    }
+
+    private void UpdateOverlayPillPositions()
+    {
+        if (BorderArtworkPlaque == null && BorderMediaInfo == null) return;
+
+        var s = _settingsService.Current;
+        var profile = s.GetWidgetProfileForDisplay(DisplayIndex);
+
+        bool widgetsActive = s.WidgetsEnabled && CanDisplayWidgets() && !_isBlackout;
+
+        if (!widgetsActive)
+        {
+            ApplyPillPlacement(HorizontalAlignment.Left, VerticalAlignment.Bottom, new Thickness(56, 0, 0, 48));
+            return;
+        }
+
+        bool quoteEnabled = profile.QuoteEnabled || (DisplayIndex == 0 && s.QuoteWidgetEnabled);
+        var effectiveQuotePos = profile.QuotePosition != WidgetPosition.Center ? profile.QuotePosition : s.QuotePosition;
+
+        bool quoteOnLeft = quoteEnabled && (
+            effectiveQuotePos == WidgetPosition.CenterLeft ||
+            effectiveQuotePos == WidgetPosition.BottomLeft);
+
+        bool hasBottomLeft = (ZoneStackBottomLeft != null && ZoneStackBottomLeft.Children.Any(c => c.Visibility == Visibility.Visible))
+            || (profile.ClockEnabled && profile.ClockPosition == WidgetPosition.BottomLeft);
+
+        bool hasBottomCenter = (ZoneStackBottomCenter != null && ZoneStackBottomCenter.Children.Any(c => c.Visibility == Visibility.Visible))
+            || (profile.ClockEnabled && profile.ClockPosition == WidgetPosition.BottomCenter);
+
+        // When quote is on the left, it extends vertically from center towards bottom dock.
+        // Lower-left has zero vertical clearance, so relocate plaque to top-left.
+        if (quoteOnLeft)
+        {
+            if (profile.ClockPosition != WidgetPosition.TopLeft)
+            {
+                ApplyPillPlacement(HorizontalAlignment.Left, VerticalAlignment.Top, new Thickness(56, 48, 0, 0));
+                return;
+            }
+
+            ApplyPillPlacement(HorizontalAlignment.Right, VerticalAlignment.Bottom, new Thickness(0, 0, 56, 48));
+            return;
+        }
+
+        // When bottom dock has cards, avoid baseline collision by using top-left
+        if (hasBottomLeft || hasBottomCenter)
+        {
+            if (profile.ClockPosition != WidgetPosition.TopLeft && (!profile.QuoteEnabled || profile.QuotePosition != WidgetPosition.TopLeft))
+            {
+                ApplyPillPlacement(HorizontalAlignment.Left, VerticalAlignment.Top, new Thickness(56, 48, 0, 0));
+                return;
+            }
+
+            // Fallback: elevate above bottom dock cards (card height 108 + margin 48 = 156, + 12px gap = 168)
+            ApplyPillPlacement(HorizontalAlignment.Left, VerticalAlignment.Bottom, new Thickness(56, 0, 0, 168));
+            return;
+        }
+
+        // Clean baseline resting position in bottom-left corner
+        ApplyPillPlacement(HorizontalAlignment.Left, VerticalAlignment.Bottom, new Thickness(56, 0, 0, 48));
+    }
+
+    private void ApplyPillPlacement(HorizontalAlignment hAlign, VerticalAlignment vAlign, Thickness margin)
+    {
+        if (BorderArtworkPlaque != null)
+        {
+            BorderArtworkPlaque.HorizontalAlignment = hAlign;
+            BorderArtworkPlaque.VerticalAlignment = vAlign;
+            BorderArtworkPlaque.Margin = margin;
+        }
+
+        if (BorderMediaInfo != null)
+        {
+            BorderMediaInfo.HorizontalAlignment = hAlign;
+            BorderMediaInfo.VerticalAlignment = vAlign;
+            BorderMediaInfo.Margin = margin;
+        }
+    }
+
+    private async void StartKnowledgeMapWeb(AppSettings s)
+    {
+        if (KnowledgeMapWebView == null) return;
+        try
+        {
+            KnowledgeMapWebView.Visibility = Visibility.Visible;
+            if (KnowledgeMapWebView.CoreWebView2 == null)
+            {
+                await KnowledgeMapWebView.EnsureCoreWebView2Async();
+                var core = KnowledgeMapWebView.CoreWebView2;
+                if (core != null)
+                {
+                    core.Settings.IsScriptEnabled = true;
+                    core.Settings.AreDefaultContextMenusEnabled = false;
+                    core.Settings.AreDevToolsEnabled = false;
+
+                    string htmlPath = Path.Combine(AppContext.BaseDirectory, "Assets", "KnowledgeMap", "index.html");
+                    if (File.Exists(htmlPath))
+                    {
+                        core.Navigate(new Uri(htmlPath).AbsoluteUri);
+                    }
+                    else
+                    {
+                        KnowledgeMapWebView.Source = new Uri("ms-appx:///Assets/KnowledgeMap/index.html");
+                    }
+                }
+
+                KnowledgeMapWebView.NavigationCompleted += (sender, args) =>
+                {
+                    if (args.IsSuccess)
+                    {
+                        string json = KnowledgeMapService.GetGraphJson(s);
+                        KnowledgeMapWebView.CoreWebView2?.PostWebMessageAsJson(json);
+                        _ = KnowledgeMapWebView.CoreWebView2?.ExecuteScriptAsync($"window.setGraphData({json});");
+                    }
+                };
+            }
+            else
+            {
+                string json = KnowledgeMapService.GetGraphJson(s);
+                KnowledgeMapWebView.CoreWebView2?.PostWebMessageAsJson(json);
+                _ = KnowledgeMapWebView.CoreWebView2?.ExecuteScriptAsync($"window.setGraphData({json});");
+            }
+        }
+        catch (Exception ex)
+        {
+            App.Log($"[ScreensaverWindow] Error starting KnowledgeMapWebView: {ex.Message}");
+        }
+    }
+
+    private void StopKnowledgeMapWeb()
+    {
+        if (KnowledgeMapWebView != null)
+        {
+            KnowledgeMapWebView.Visibility = Visibility.Collapsed;
+        }
     }
 
     private static async Task<string> ExtractExifSummaryAsync(string filePath)

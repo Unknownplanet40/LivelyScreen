@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-11-06
+
+### Added
+- **3D Stash Knowledge Map Screensaver**: Visualizes SQLite knowledge bases (e.g. `brain.db` from KnowledgeBase-Quotes) as an interactive celestial constellation starfield with 3D depth, harmonic drift, and synaptic node filaments.
+- **Knowledge Map Customizations**: Support for 3D Celestial Constellation vs. 2D Plane spin modes, adjustable orbit speed, camera pitch tilt, and clean distraction-free fullscreen (widget suppression).
+
+### Fixed
+- **Rich Text Release Notes**: Formatted markdown rendering in the built-in update notification viewer instead of displaying raw markdown markup.
+
 ## [1.0.8] - 2026-11-03
 
 ### Added

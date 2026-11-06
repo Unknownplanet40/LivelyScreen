@@ -931,6 +931,111 @@
                             </StackPanel>
                         </Expander>
 
+                        <!-- CATEGORY 4: STASH KNOWLEDGE MAP SCREENSAVER -->
+                        <Expander x:Name="ExpanderKnowledgeMap" IsExpanded="False" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Expander.Header>
+                                <Grid HorizontalAlignment="Stretch">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="🧠 Stash Knowledge Map" FontWeight="SemiBold" FontSize="15"/>
+                                            <Border Background="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="4" Padding="6,2">
+                                                <TextBlock x:Name="TxtKnowledgeMapBadge" Text="3D Celestial" FontSize="11" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" FontWeight="SemiBold"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="Orbits your notes, books, quotes &amp; tags as a celestial constellation starfield with 3D depth and node filaments." FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button x:Name="BtnActivateKnowledgeMap"
+                                                Content="Set as Screensaver"
+                                                Click="OnActivateKnowledgeMapClicked"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                Padding="12,5"
+                                                FontSize="12"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Expander.Header>
+
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <!-- Stash brain.db Location -->
+                                <labs:SettingsCard Header="Stash SQLite Database (brain.db)" Description="Path to your KnowledgeBase-Quotes database file. Connects live to all your notes and links.">
+                                    <Grid ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox x:Name="TxtKnowledgeMapDbPath"
+                                                 Grid.Column="0"
+                                                 Width="360"
+                                                 PlaceholderText="C:\Users\...\data\brain.db"
+                                                 TextChanged="OnKnowledgeMapDbPathChanged"/>
+                                        <Button Grid.Column="1"
+                                                Content="Browse..."
+                                                Click="OnBrowseKnowledgeMapDbClicked"/>
+                                    </Grid>
+                                </labs:SettingsCard>
+
+                                <!-- Connection Status -->
+                                <Border CornerRadius="8"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        Padding="14,10"
+                                        HorizontalAlignment="Stretch">
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <FontIcon x:Name="IconKnowledgeMapStatus" Glyph="&#xE73E;" FontSize="15" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"/>
+                                        <TextBlock x:Name="TxtKnowledgeMapStatus" Text="Connected (brain.db)" FontSize="12.5" FontWeight="Medium" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Animation Mode Dropdown -->
+                                <labs:SettingsCard Header="Animation Mode" Description="Choose between 3D Celestial Orbit with depth perspective or flat 2D Plane Spin.">
+                                    <ComboBox x:Name="ComboKnowledgeMapStyle" SelectionChanged="OnSettingChanged" Width="260">
+                                        <ComboBoxItem Content="3D Celestial Constellation (Recommended)"/>
+                                        <ComboBoxItem Content="2D Plane Spin"/>
+                                    </ComboBox>
+                                </labs:SettingsCard>
+
+                                <!-- Orbit Speed Slider -->
+                                <labs:SettingsCard Header="Orbit Speed" Description="Rotation velocity of the constellation.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderKnowledgeMapSpeed"
+                                                Minimum="0.2" Maximum="3.0" StepFrequency="0.1"
+                                                Width="160"
+                                                ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtKnowledgeMapSpeedVal"
+                                                   Text="1.0x"
+                                                   Width="45"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Camera Tilt (Pitch) Slider -->
+                                <labs:SettingsCard Header="3D Camera Tilt (Pitch)" Description="Angle of inclination for celestial depth and parallax perspective.">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Slider x:Name="SliderKnowledgeMapPitch"
+                                                Minimum="0" Maximum="60" StepFrequency="1"
+                                                Width="160"
+                                                ValueChanged="OnSettingChanged"/>
+                                        <TextBlock x:Name="TxtKnowledgeMapPitchVal"
+                                                   Text="28°"
+                                                   Width="45"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </labs:SettingsCard>
+
+                                <!-- Widget Overlay / Distraction Free Mode -->
+                                <labs:SettingsCard Header="Clean Fullscreen (Suppress Widgets)" Description="Hide lockscreen clock, weather, and badges while Knowledge Map is active for a distraction-free constellation view.">
+                                    <ToggleSwitch x:Name="ToggleKnowledgeMapSuppressWidgets" OnContent="Widgets Hidden" OffContent="Widgets Visible" Toggled="OnSettingChanged"/>
+                                </labs:SettingsCard>
+                            </StackPanel>
+                        </Expander>
+
                         <labs:SettingsCard Header="Video Audio &amp; Volume" Description="Muted by default to prevent unexpected noise.">
                             <StackPanel Orientation="Horizontal" Spacing="16">
                                 <ToggleSwitch x:Name="ToggleAudio" OnContent="Audio On" OffContent="Muted" Toggled="OnSettingChanged"/>

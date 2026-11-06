@@ -157,6 +157,7 @@ public sealed partial class MainPage : Page
         LoadSimBsodAndCustomTextsToUI(s);
         UpdateSimPresetButtonsUI();
         UpdateSimScheduleSummaryText();
+        LoadKnowledgeMapSettingsToUI(s);
 
         ToggleCustomSolar.IsOn = s.UseCustomSolarTimes;
 
@@ -273,6 +274,26 @@ public sealed partial class MainPage : Page
             _ => 0
         };
         ComboWidgetAccentStyle.SelectedIndex = s.WidgetUseSystemAccent ? 1 : 0;
+
+        // Knowledge Map Settings
+        if (ComboKnowledgeMapStyle != null && ComboKnowledgeMapStyle.SelectedIndex >= 0)
+        {
+            s.KnowledgeMapStyle = (KnowledgeMapStyle)ComboKnowledgeMapStyle.SelectedIndex;
+        }
+        if (SliderKnowledgeMapSpeed != null)
+        {
+            s.KnowledgeMapOrbitSpeed = SliderKnowledgeMapSpeed.Value;
+            if (TxtKnowledgeMapSpeedVal != null) TxtKnowledgeMapSpeedVal.Text = $"{SliderKnowledgeMapSpeed.Value:F1}x";
+        }
+        if (SliderKnowledgeMapPitch != null)
+        {
+            s.KnowledgeMapCameraPitch = SliderKnowledgeMapPitch.Value;
+            if (TxtKnowledgeMapPitchVal != null) TxtKnowledgeMapPitchVal.Text = $"{SliderKnowledgeMapPitch.Value:F0}°";
+        }
+        if (ToggleKnowledgeMapSuppressWidgets != null)
+        {
+            s.KnowledgeMapSuppressWidgets = ToggleKnowledgeMapSuppressWidgets.IsOn;
+        }
 
         // Weather Settings
         ToggleWeatherWidget.IsOn = s.WeatherWidgetEnabled;
@@ -736,6 +757,25 @@ public sealed partial class MainPage : Page
 
         TxtThemeBadge.Text = $"{dynSources.Count} Theme(s)";
         TxtStandardFolderBadge.Text = $"{stdSources.Count} Folder(s)";
+
+        bool isMapAvailable = LivelyScreen.Services.KnowledgeMapService.IsAvailable(_settingsService.Current.KnowledgeMapDatabasePath);
+        if (ExpanderKnowledgeMap != null)
+        {
+            ExpanderKnowledgeMap.Visibility = isMapAvailable ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (TxtKnowledgeMapBadge != null)
+        {
+            TxtKnowledgeMapBadge.Text = _settingsService.Current.IsKnowledgeMapActive()
+                ? "✓ Active Map"
+                : (_settingsService.Current.KnowledgeMapStyle == KnowledgeMapStyle.Celestial3D ? "3D Celestial" : "2D Plane");
+        }
+        if (BtnActivateKnowledgeMap != null)
+        {
+            bool isMapActive = _settingsService.Current.IsKnowledgeMapActive();
+            BtnActivateKnowledgeMap.Content = isMapActive ? "✓ Active Map" : "Activate Map";
+            BtnActivateKnowledgeMap.IsEnabled = !isMapActive;
+        }
+
         if (TxtSimulationBadge != null)
         {
             var activeSimMode = _settingsService.Current.GetEffectiveSimulationMode();
@@ -749,6 +789,12 @@ public sealed partial class MainPage : Page
         {
             var simMode = _settingsService.Current.GetEffectiveSimulationMode();
             TxtActiveSourceTitle.Text = $"Simulation Suite: {AppSettings.GetSimulationDisplayName(simMode)} (Widgets Suppressed)";
+            BtnPlayAllCombined.Content = "Play All (Combined)";
+            BtnPlayAllCombined.IsEnabled = true;
+        }
+        else if (_settingsService.Current.IsKnowledgeMapActive())
+        {
+            TxtActiveSourceTitle.Text = $"Knowledge Map: {(_settingsService.Current.KnowledgeMapStyle == KnowledgeMapStyle.Celestial3D ? "3D Celestial Constellation" : "2D Plane Spin")} (Stash)";
             BtnPlayAllCombined.Content = "Play All (Combined)";
             BtnPlayAllCombined.IsEnabled = true;
         }
@@ -1043,6 +1089,7 @@ public sealed partial class MainPage : Page
         if (sender is Button btn && btn.Tag is string path)
         {
             _settingsService.Current.ActiveSourcePath = path;
+            _settingsService.Current.KnowledgeMapEnabled = false;
 
             if (AppSettings.TryParseSimulationSource(path, out var simMode))
             {
@@ -2018,6 +2065,26 @@ public sealed partial class MainPage : Page
             s.WidgetUseSystemAccent = ComboWidgetAccentStyle.SelectedIndex == 1;
         }
 
+        // Knowledge Map Settings
+        if (ComboKnowledgeMapStyle != null && ComboKnowledgeMapStyle.SelectedIndex >= 0)
+        {
+            s.KnowledgeMapStyle = (KnowledgeMapStyle)ComboKnowledgeMapStyle.SelectedIndex;
+        }
+        if (SliderKnowledgeMapSpeed != null)
+        {
+            s.KnowledgeMapOrbitSpeed = SliderKnowledgeMapSpeed.Value;
+            if (TxtKnowledgeMapSpeedVal != null) TxtKnowledgeMapSpeedVal.Text = $"{SliderKnowledgeMapSpeed.Value:F1}x";
+        }
+        if (SliderKnowledgeMapPitch != null)
+        {
+            s.KnowledgeMapCameraPitch = SliderKnowledgeMapPitch.Value;
+            if (TxtKnowledgeMapPitchVal != null) TxtKnowledgeMapPitchVal.Text = $"{SliderKnowledgeMapPitch.Value:F0}°";
+        }
+        if (ToggleKnowledgeMapSuppressWidgets != null)
+        {
+            s.KnowledgeMapSuppressWidgets = ToggleKnowledgeMapSuppressWidgets.IsOn;
+        }
+
         // Weather Settings
         if (ToggleWeatherWidget != null) s.WeatherWidgetEnabled = ToggleWeatherWidget.IsOn;
         if (TxtWeatherCity != null) s.WeatherCity = string.IsNullOrWhiteSpace(TxtWeatherCity.Text) ? "Auto" : TxtWeatherCity.Text.Trim();
@@ -2300,6 +2367,110 @@ public sealed partial class MainPage : Page
             LivePreviewQuoteCard?.ShowNextQuoteImmediate(true);
             MiniPreviewQuoteWidget?.ShowNextQuoteImmediate(true);
             UpdateAllWidgetPositionPreviews();
+        }
+    }
+
+    private void LoadKnowledgeMapSettingsToUI(AppSettings s)
+    {
+        bool isMapAvailable = LivelyScreen.Services.KnowledgeMapService.IsAvailable(s.KnowledgeMapDatabasePath);
+        if (ExpanderKnowledgeMap != null)
+        {
+            ExpanderKnowledgeMap.Visibility = isMapAvailable ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (TxtKnowledgeMapDbPath != null)
+        {
+            TxtKnowledgeMapDbPath.Text = s.KnowledgeMapDatabasePath ?? string.Empty;
+        }
+        if (ComboKnowledgeMapStyle != null)
+        {
+            ComboKnowledgeMapStyle.SelectedIndex = (int)s.KnowledgeMapStyle;
+        }
+        if (SliderKnowledgeMapSpeed != null)
+        {
+            SliderKnowledgeMapSpeed.Value = Math.Clamp(s.KnowledgeMapOrbitSpeed, 0.2, 5.0);
+        }
+        if (TxtKnowledgeMapSpeedVal != null)
+        {
+            TxtKnowledgeMapSpeedVal.Text = $"{s.KnowledgeMapOrbitSpeed:F1}x";
+        }
+        if (SliderKnowledgeMapPitch != null)
+        {
+            SliderKnowledgeMapPitch.Value = Math.Clamp(s.KnowledgeMapCameraPitch, -45.0, 45.0);
+        }
+        if (TxtKnowledgeMapPitchVal != null)
+        {
+            TxtKnowledgeMapPitchVal.Text = $"{s.KnowledgeMapCameraPitch:F0}°";
+        }
+        if (ToggleKnowledgeMapSuppressWidgets != null)
+        {
+            ToggleKnowledgeMapSuppressWidgets.IsOn = s.KnowledgeMapSuppressWidgets;
+        }
+        UpdateKnowledgeMapStatusUI(s.KnowledgeMapDatabasePath);
+    }
+
+    private void UpdateKnowledgeMapStatusUI(string? dbPath)
+    {
+        if (TxtKnowledgeMapStatus == null) return;
+        var resolved = KnowledgeMapService.ResolveDatabasePath(dbPath);
+        if (!string.IsNullOrEmpty(resolved) && File.Exists(resolved))
+        {
+            try
+            {
+                var graph = KnowledgeMapService.LoadGraph(resolved);
+                if (graph.Nodes.Count > 0)
+                {
+                    TxtKnowledgeMapStatus.Text = $"Connected: {graph.Nodes.Count} notes, {graph.Edges.Count} links ({Path.GetFileName(resolved)})";
+                    if (IconKnowledgeMapStatus != null)
+                    {
+                        IconKnowledgeMapStatus.Glyph = "\uE73E";
+                    }
+                    return;
+                }
+            }
+            catch { }
+        }
+
+        TxtKnowledgeMapStatus.Text = "Not connected (Using demo constellation: 55 notes)";
+        if (IconKnowledgeMapStatus != null)
+        {
+            IconKnowledgeMapStatus.Glyph = "\uE946";
+        }
+    }
+
+    private void OnActivateKnowledgeMapClicked(object sender, RoutedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null) return;
+        var s = _settingsService.Current;
+        s.ActiveSourcePath = AppSettings.KnowledgeMapSourceKey;
+        s.KnowledgeMapEnabled = true;
+        s.SimulationModeEnabled = false;
+        s.DynamicThemeEnabled = false;
+        _settingsService.Save();
+        UpdateSourceList();
+        UpdateControlStates();
+        App.Log("ActiveSourcePath set to KnowledgeMap");
+    }
+
+    private void OnKnowledgeMapDbPathChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isInitializing || _settingsService == null || TxtKnowledgeMapDbPath == null) return;
+        var path = TxtKnowledgeMapDbPath.Text?.Trim() ?? string.Empty;
+        _settingsService.Current.KnowledgeMapDatabasePath = path;
+        _settingsService.Save();
+        UpdateKnowledgeMapStatusUI(path);
+    }
+
+    private void OnBrowseKnowledgeMapDbClicked(object sender, RoutedEventArgs e)
+    {
+        if (_settingsService == null) return;
+        var filter = "SQLite Database (*.db;*.sqlite;*.sqlite3)\0*.db;*.sqlite;*.sqlite3\0All Files (*.*)\0*.*\0\0";
+        var filePath = NativeMethods.PickFile(_windowHandle, "Select Stash / KnowledgeBase SQLite Database (brain.db)", filter);
+        if (!string.IsNullOrWhiteSpace(filePath))
+        {
+            if (TxtKnowledgeMapDbPath != null) TxtKnowledgeMapDbPath.Text = filePath;
+            _settingsService.Current.KnowledgeMapDatabasePath = filePath;
+            _settingsService.Save();
+            UpdateKnowledgeMapStatusUI(filePath);
         }
     }
 
@@ -3168,6 +3339,7 @@ public sealed partial class MainPage : Page
             {
                 _settingsService.Current.MediaFolders.Add(path);
                 _settingsService.Current.ActiveSourcePath = path;
+            _settingsService.Current.KnowledgeMapEnabled = false;
                 var theme = DynamicThemeService.TryLoadThemeFromFolder(path);
                 if (theme != null)
                 {

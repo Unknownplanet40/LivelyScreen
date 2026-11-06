@@ -143,6 +143,12 @@ public enum SimulationFinishAction
     DismissScreensaver = 3 // Automatically exits screensaver at 100%
 }
 
+public enum KnowledgeMapStyle
+{
+    Celestial3D = 0,
+    Plane2D = 1
+}
+
 public class AppSettings
 {
     public AppThemeMode ThemePreference { get; set; } = AppThemeMode.System;
@@ -299,6 +305,28 @@ public class AppSettings
         SimulationModeType.RandomOSUpdate => "Random OS Update (Shuffle)",
         _ => "Simulation Mode"
     };
+
+    // Stash Knowledge Map Screensaver
+    public const string KnowledgeMapSourceKey = "KNOWLEDGE_MAP";
+    public bool KnowledgeMapEnabled { get; set; } = false;
+    public string KnowledgeMapDatabasePath { get; set; } = @"C:\Users\ryanj\OneDrive\Desktop\Applications\KnowledgeBase-Quotes\data\brain.db";
+    public KnowledgeMapStyle KnowledgeMapStyle { get; set; } = KnowledgeMapStyle.Celestial3D;
+    public double KnowledgeMapOrbitSpeed { get; set; } = 1.0; // 0.2x to 3.0x
+    public double KnowledgeMapCameraPitch { get; set; } = 28.0; // 0 to 65 degrees
+    public double KnowledgeMapDepthSpread { get; set; } = 360.0; // 50 to 600
+    public bool KnowledgeMapSuppressWidgets { get; set; } = false;
+
+    public bool IsKnowledgeMapActive(string? overrideSourcePath = null)
+    {
+        if (!LivelyScreen.Services.KnowledgeMapService.IsAvailable(KnowledgeMapDatabasePath))
+            return false;
+
+        if (string.Equals(overrideSourcePath, KnowledgeMapSourceKey, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (string.Equals(ActiveSourcePath, KnowledgeMapSourceKey, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return KnowledgeMapEnabled;
+    }
 
     public int MouseSensitivityPixels { get; set; } = 25;
     public bool AllowDisplaySleep { get; set; } = true;

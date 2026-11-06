@@ -51,7 +51,7 @@
         <Border x:Name="BorderMediaInfo"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Bottom"
-                Margin="48,0,0,40"
+                Margin="56,0,0,48"
                 Background="#B8141720"
                 BorderBrush="#25FFFFFF"
                 BorderThickness="1"
@@ -75,7 +75,7 @@
         <Border x:Name="BorderArtworkPlaque"
                 HorizontalAlignment="Left"
                 VerticalAlignment="Bottom"
-                Margin="48,0,0,40"
+                Margin="56,0,0,48"
                 Background="#D010131A"
                 BorderBrush="#35FFFFFF"
                 BorderThickness="1"
@@ -108,6 +108,14 @@
                            TextTrimming="CharacterEllipsis"/>
             </StackPanel>
         </Border>
+
+        <!-- Stash Knowledge Map Web Layer (WebView2) -->
+        <WebView2 x:Name="KnowledgeMapWebView"
+                  Visibility="Collapsed"
+                  IsHitTestVisible="False"
+                  HorizontalAlignment="Stretch"
+                  VerticalAlignment="Stretch"
+                  DefaultBackgroundColor="#FF0B0D10"/>
 
         <!-- OLED Protected Widgets Container with Dynamic Pixel-Shift Transform -->
         <Grid x:Name="OledShiftContainer" IsHitTestVisible="False">

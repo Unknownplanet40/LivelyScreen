@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stash Knowledge Map Screensaver</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background: #0b0d10;
+    }
+    #canvas-container {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at 50% 45%, #141a24 0%, #0b0d10 75%);
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="graphCanvas"></canvas>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = 0, height = 0;
+    let dpr = 1;
+
+    function resize() {
+      dpr = window.devicePixelRatio || 1;
+      width = canvas.width = window.innerWidth * dpr;
+      height = canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    window.addEventListener('resize', resize);
+
+    // Camera & Celestial settings
+    let mode = '3d'; // '3d' | '2d'
+    let orbitSpeed = 1.0;
+    let cameraPitch = 28 * (Math.PI / 180); // ~0.48 rad
+    let cameraYaw = 0;
+    let depthSpread = 360;
+    const FOV = 750;
+    const CAMERA_DISTANCE = 820;
+
+    let suppressWidgets = false;
+    let maxClusterRadius = 250;
+
+    const THEME_COLORS = {
+      troubleshooting: '#e26d80',
+      note: '#5b8def',
+      quote: '#e3a857',
+      saying: '#4fbf9f',
+      joke: '#9c7bea',
+      book: '#06b6d4',
+      diary: '#ec4899',
+      recipe: '#84cc16',
+      fallback: '#8b93a1',
+      favorite: '#f5b942',
+      edge: '150, 165, 190'
+    };
+
+    let nodes = [];
+    let edges = [];
+    let nodeMap = new Map();
+
+    // 3D Perspective Projection matching Stash
+    function project3D(x, y, z, cx, cy) {
+      const cosY = Math.cos(cameraYaw);
+      const sinY = Math.sin(cameraYaw);
+      const x1 = x * cosY - z * sinY;
+      const z1 = z * cosY + x * sinY;
+
+      const cosP = Math.cos(cameraPitch);
+      const sinP = Math.sin(cameraPitch);
+      const y2 = y * cosP - z1 * sinP;
+      const z2 = z1 * cosP + y * sinP;
+
+      const depth = CAMERA_DISTANCE + z2;
+      const scale = FOV / Math.max(90, depth);
+
+      return {
+        screenX: cx + x1 * scale,
+        screenY: cy + y2 * scale,
+        scale: scale,
+        depth: z2,
+        alpha: Math.max(0.28, Math.min(1.0, 1.0 - (z2 / 500) * 0.65))
+      };
+    }
+
+    // Set graph data from C#
+    window.setGraphData = function(payload) {
+      if (!payload) return;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch (e) { return; }
+      }
+
+      if (payload.style) mode = payload.style === '2d' ? '2d' : '3d';
+      if (payload.speed !== undefined) orbitSpeed = Math.max(0.1, payload.speed);
+      if (payload.pitch !== undefined) cameraPitch = payload.pitch * (Math.PI / 180);
+      if (payload.suppressWidgets !== undefined) suppressWidgets = !!payload.suppressWidgets;
+
+      const rawNodes = payload.nodes || [];
+      const rawEdges = payload.edges || [];
+      if (rawNodes.length === 0) return;
+
+      nodeMap.clear();
+      nodes = [];
+      edges = [];
+
+      // Compute centroid to center constellation around (0, 0, 0)
+      let sumX = 0, sumY = 0, sumZ = 0;
+      for (let i = 0; i < rawNodes.length; i++) {
+        sumX += (rawNodes[i].x || 0);
+        sumY += (rawNodes[i].y || 0);
+        sumZ += (rawNodes[i].z || 0);
+      }
+      const avgX = sumX / Math.max(1, rawNodes.length);
+      const avgY = sumY / Math.max(1, rawNodes.length);
+      const avgZ = sumZ / Math.max(1, rawNodes.length);
+
+      let maxDistSq = 0;
+      for (let i = 0; i < rawNodes.length; i++) {
+        const rn = rawNodes[i];
+        const deg = rn.degree || 0;
+        const color = rn.color || THEME_COLORS[rn.type] || THEME_COLORS.fallback;
+
+        const bx = (rn.x || 0) - avgX;
+        const by = (rn.y || 0) - avgY;
+        const bz = (rn.z || 0) - avgZ;
+
+        const dSq = bx * bx + by * by + bz * bz;
+        if (dSq > maxDistSq) maxDistSq = dSq;
+
+        const node = {
+          id: rn.id,
+          title: rn.label || rn.title || `Note ${rn.id}`,
+          type: rn.type || 'note',
+          color: color,
+          favorite: !!rn.favorite,
+          degree: deg,
+          r: 5.2 + Math.sqrt(Math.max(0, deg)) * 2.4,
+          baseX: bx,
+          baseY: by,
+          baseZ: bz,
+          phase: (rn.id * 1.618) % (Math.PI * 2)
+        };
+
+        nodes.push(node);
+        nodeMap.set(rn.id, i);
+      }
+
+      maxClusterRadius = Math.max(140, Math.sqrt(maxDistSq));
+
+      for (let i = 0; i < rawEdges.length; i++) {
+        const re = rawEdges[i];
+        const sIdx = nodeMap.get(re.source);
+        const tIdx = nodeMap.get(re.target);
+        if (sIdx !== undefined && tIdx !== undefined && sIdx !== tIdx) {
+          edges.push({ source: sIdx, target: tIdx, hop: re.hop || 1 });
+        }
+      }
+    };
+
+    // WebView2 message listener
+    if (window.chrome && window.chrome.webview) {
+      window.chrome.webview.addEventListener('message', (event) => {
+        window.setGraphData(event.data);
+      });
+    }
+
+    // Initial render setup
+    let lastTime = performance.now();
+    let startTime = lastTime;
+    resize();
+
+    // Synaptic neural pulse tracking
+    const CYCLE_MS = 6000;
+    const ACTIVE_MS = 3900;
+
+    function render(now) {
+      requestAnimationFrame(render);
+      const dt = Math.min(0.1, (now - lastTime) / 1000);
+      lastTime = now;
+      const elapsed = (now - startTime) / 1000;
+      const elapsedMs = now - startTime;
+
+      // Celestial orbital rotation
+      if (mode === '3d') {
+        cameraYaw += dt * 0.035 * orbitSpeed;
+        cameraPitch = 28 * (Math.PI / 180) + Math.sin(elapsed * 0.39) * 0.18;
+      } else {
+        cameraYaw += dt * 0.035 * orbitSpeed;
+        cameraPitch = 0;
+      }
+
+      const cssWidth = window.innerWidth;
+      const cssHeight = window.innerHeight;
+      const cx = cssWidth * 0.5;
+      const cy = suppressWidgets ? (cssHeight * 0.5) : (cssHeight * 0.48);
+
+      // Auto-fit constellation: comfortably fills ~80% of screen height (e.g. ~840px on 1080p, ~1120px on 1440p)
+      // leaves natural clearance at top for clock and at bottom for widgets dock
+      const targetScreenRadius = Math.min(cssWidth * 0.46, cssHeight * 0.40);
+      const avgPerspective = FOV / CAMERA_DISTANCE; // 750 / 820 ≈ 0.915
+      const fitScale = targetScreenRadius / Math.max(80, maxClusterRadius * avgPerspective);
+
+      ctx.clearRect(0, 0, cssWidth, cssHeight);
+
+      if (nodes.length === 0) return;
+
+      // Project all nodes
+      const projected = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+
+        // Sinusoidal floating wave drift
+        const waveX = Math.cos(elapsed * 1.2 + n.id * 1.73) * 3.5;
+        const waveY = Math.sin(elapsed * 0.9 + n.id * 2.41) * 3.5;
+
+        const nx = (n.baseX + waveX) * fitScale;
+        const ny = (n.baseY + waveY) * fitScale;
+        const nz = mode === '3d' ? (n.baseZ * fitScale) : 0;
+
+        const p = project3D(nx, ny, nz, cx, cy);
+        projected.push({ ...p, node: n });
+      }
+
+      // 1. Draw connecting filament lines
+      for (let i = 0; i < edges.length; i++) {
+        const edge = edges[i];
+        const p1 = projected[edge.source];
+        const p2 = projected[edge.target];
+        if (!p1 || !p2) continue;
+
+        const avgAlpha = (p1.alpha + p2.alpha) * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(p1.screenX, p1.screenY);
+        ctx.lineTo(p2.screenX, p2.screenY);
+        ctx.strokeStyle = `rgba(${THEME_COLORS.edge}, ${avgAlpha * 0.28})`;
+        ctx.lineWidth = Math.max(0.6, Math.min(p1.scale, p2.scale) * 0.85);
+        ctx.stroke();
+      }
+
+      // 2. Cascading Synaptic Pulse Sparks
+      const pulseT = elapsedMs % CYCLE_MS;
+      if (pulseT < ACTIVE_MS && edges.length > 0) {
+        const normP = pulseT / ACTIVE_MS; // 0..1
+        let maxHop = 1;
+        for (let i = 0; i < edges.length; i++) {
+          if (edges[i].hop > maxHop) maxHop = edges[i].hop;
+        }
+
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < edges.length; i++) {
+          const edge = edges[i];
+          const h = edge.hop || 1;
+          const tStart = (h - 1) / maxHop;
+          const tEnd = h / maxHop;
+
+          if (normP >= tStart && normP <= tEnd) {
+            const p1 = projected[edge.source];
+            const p2 = projected[edge.target];
+            if (!p1 || !p2) continue;
+
+            const p = (normP - tStart) / (tEnd - tStart);
+            const sx = p1.screenX + (p2.screenX - p1.screenX) * p;
+            const sy = p1.screenY + (p2.screenY - p1.screenY) * p;
+            const sparkScale = (p1.scale + p2.scale) * 0.5;
+
+            // Halo
+            ctx.beginPath();
+            ctx.arc(sx, sy, 7.0 * sparkScale, 0, Math.PI * 2);
+            ctx.fillStyle = p2.node.color;
+            ctx.globalAlpha = 0.55 * Math.min(p1.alpha, p2.alpha);
+            ctx.fill();
+
+            // Core
+            ctx.beginPath();
+            ctx.arc(sx, sy, 2.5 * sparkScale, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = 0.95;
+            ctx.fill();
+
+            // Destination flash ring
+            if (p > 0.70) {
+              const ringP = (p - 0.70) / 0.30;
+              const ringR = p2.node.r * p2.scale + ringP * 12 * p2.scale;
+              ctx.beginPath();
+              ctx.arc(p2.screenX, p2.screenY, ringR, 0, Math.PI * 2);
+              ctx.strokeStyle = p2.node.color;
+              ctx.lineWidth = 1.4 * p2.scale;
+              ctx.globalAlpha = Math.sin(ringP * Math.PI) * 0.65;
+              ctx.stroke();
+            }
+          }
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+      }
+
+      // 3. Sort nodes by depth (painter's algorithm)
+      const renderList = [...projected];
+      if (mode === '3d') {
+        renderList.sort((a, b) => a.depth - b.depth);
+      }
+
+      // 4. Subtle Additive Glow Pass
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < renderList.length; i++) {
+        const p = renderList[i];
+        const n = p.node;
+        const radius = Math.max(4.0, n.r * p.scale);
+        const glowRadius = radius * 2.5;
+        const pulse = Math.sin(elapsed * 2.0 + n.id * 0.73) * 0.25;
+
+        const grad = ctx.createRadialGradient(p.screenX, p.screenY, 0, p.screenX, p.screenY, glowRadius);
+        grad.addColorStop(0, n.color);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.globalAlpha = Math.max(0.03, Math.min(0.5, (0.32 + pulse * 0.08) * p.alpha));
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.screenX, p.screenY, glowRadius * (1.0 + pulse * 0.1), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+
+      // 5. Draw Node Circles & Favorite Rings
+      for (let i = 0; i < renderList.length; i++) {
+        const p = renderList[i];
+        const n = p.node;
+        const radius = Math.max(4.0, n.r * p.scale);
+        ctx.globalAlpha = mode === '3d' ? p.alpha : 1.0;
+
+        // Circle body
+        ctx.beginPath();
+        ctx.arc(p.screenX, p.screenY, radius, 0, Math.PI * 2);
+        ctx.fillStyle = n.color;
+        ctx.fill();
+
+        // White rim stroke
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.lineWidth = Math.max(0.9, 1.1 * p.scale);
+        ctx.stroke();
+
+        // Favorite golden ring
+        if (n.favorite) {
+          ctx.beginPath();
+          ctx.arc(p.screenX, p.screenY, radius + 2.8 * p.scale, 0, Math.PI * 2);
+          ctx.strokeStyle = THEME_COLORS.favorite;
+          ctx.lineWidth = 1.6 * p.scale;
+          ctx.stroke();
+        }
+
+        // Hub ripple waves
+        if (n.degree >= 3) {
+          const ripple = (elapsed * 0.45 + (n.id % 1000) * 0.001) % 1.0;
+          ctx.beginPath();
+          ctx.arc(p.screenX, p.screenY, radius + ripple * 14 * p.scale, 0, Math.PI * 2);
+          ctx.strokeStyle = n.color;
+          ctx.lineWidth = 1.3 * p.scale;
+          ctx.globalAlpha = (1.0 - ripple) * 0.3 * p.alpha;
+          ctx.stroke();
+          ctx.globalAlpha = mode === '3d' ? p.alpha : 1.0;
+        }
+      }
+
+      // 6. Labels with collision culling & screen boundary safety
+      const placedBoxes = [];
+      const candidates = renderList
+        .filter(p => p.scale > 0.72 || p.node.degree >= 1 || p.node.favorite)
+        .sort((a, b) => (b.node.favorite ? 1 : 0) - (a.node.favorite ? 1 : 0) || b.node.degree - a.node.degree || b.scale - a.scale);
+
+      ctx.textAlign = 'center';
+      for (let i = 0; i < candidates.length; i++) {
+        const p = candidates[i];
+        const n = p.node;
+        const radius = Math.max(4.0, n.r * p.scale);
+        const fontSize = Math.max(10, Math.round(11.5 * p.scale));
+        ctx.font = `500 ${fontSize}px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", sans-serif`;
+
+        const textW = ctx.measureText(n.title).width;
+        let labelX = p.screenX;
+        const halfW = textW / 2 + 6;
+        if (labelX - halfW < 14) labelX = 14 + halfW;
+        else if (labelX + halfW > cssWidth - 14) labelX = cssWidth - 14 - halfW;
+
+        let labelY = p.screenY + radius + 4 * p.scale + fontSize;
+        if (labelY + 6 > cssHeight - 12) {
+          labelY = p.screenY - radius - 6;
+        }
+
+        const box = {
+          x0: labelX - halfW,
+          x1: labelX + halfW,
+          y0: labelY - fontSize,
+          y1: labelY + 4
+        };
+
+        const hit = placedBoxes.some(b => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0);
+        if (hit) continue;
+        placedBoxes.push(box);
+
+        // Dark legibility halo
+        ctx.strokeStyle = 'rgba(11, 13, 16, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(n.title, labelX, labelY);
+
+        // Foreground text
+        ctx.fillStyle = n.favorite ? '#ffffff' : `rgba(203, 213, 225, ${Math.max(0.3, p.alpha * 0.95)})`;
+        ctx.fillText(n.title, labelX, labelY);
+      }
+
+      ctx.globalAlpha = 1.0;
+    }
+
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>
