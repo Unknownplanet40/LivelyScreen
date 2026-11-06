@@ -2558,9 +2558,17 @@
                                 <FontIcon Glyph="&#xE8A5;" />
                             </labs:SettingsExpander.HeaderIcon>
                             <labs:SettingsExpander.Items>
-                                <labs:SettingsCard HorizontalContentAlignment="Stretch">
-                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                                        <RichTextBlock x:Name="RichReleaseChangelog" TextWrapping="Wrap" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <labs:SettingsCard HorizontalContentAlignment="Stretch" ContentAlignment="Vertical">
+                                    <ScrollViewer MaxHeight="350"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  HorizontalScrollMode="Disabled">
+                                        <RichTextBlock x:Name="RichReleaseChangelog"
+                                                       TextWrapping="Wrap"
+                                                       IsTextSelectionEnabled="True"
+                                                       FontSize="13"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                       Margin="0,4,0,8" />
                                     </ScrollViewer>
                                 </labs:SettingsCard>
                             </labs:SettingsExpander.Items>
